@@ -1,0 +1,51 @@
+Internal Dataset Reference: Telecommunications Customer Churn
+
+Document type: Internal data summary
+Source: telecommunications_churn.csv
+Purpose: Reference document for the Research Agent's internal knowledge base (RAG). Contains only descriptive statistics computed directly from the company's own dataset — no external or industry data.
+
+DATASET OVERVIEW
+- Total customers: 3,333
+- Total features: 18 (excluding the churn label)
+- Overall churn rate: 14.49% (483 churned customers out of 3,333)
+
+FEATURES INCLUDED
+account_length, voice_mail_plan, voice_mail_messages, day_mins, evening_mins,
+night_mins, international_mins, customer_service_calls, international_plan,
+day_calls, day_charge, evening_calls, evening_charge, night_calls,
+night_charge, international_calls, international_charge, total_charge.
+
+KEY OBSERVED RELATIONSHIPS WITH CHURN
+
+1. Customer service calls
+   - Customers who churned averaged 2.23 customer service calls, versus 1.45 for customers who stayed.
+   - Customers with 4 or more service calls churned at a rate of 51.69% (267 customers in this group).
+   - Customers with fewer than 4 service calls churned at a rate of 11.25% (3,066 customers in this group).
+   - This is the single largest observed gap in the dataset between churned and retained customers.
+
+2. International plan
+   - Customers with an international plan churned at 42.41%.
+   - Customers without an international plan churned at 11.50%.
+   - Having an international plan is associated with substantially higher churn in this dataset.
+
+3. Voice mail plan
+   - Customers with a voice mail plan churned at 8.68%.
+   - Customers without a voice mail plan churned at 16.72%.
+   - Having a voice mail plan is associated with lower churn in this dataset.
+
+4. Daytime usage (day_mins)
+   - Churned customers averaged 206.9 daytime minutes, versus 175.2 minutes for retained customers.
+   - Higher daytime usage is associated with higher churn in this dataset.
+
+5. Total charges
+   - Churned customers averaged $65.36 in total charges, versus $58.45 for retained customers.
+   - Higher total billed amount is associated with higher churn in this dataset.
+
+6. Account length (tenure)
+   - Churned customers averaged an account length of 102.7, versus 100.8 for retained customers.
+   - Account length alone shows only a small difference between churned and retained customers in this dataset.
+
+NOTES FOR THE RESEARCH AGENT
+- All figures above are descriptive statistics computed directly from this dataset (simple group averages and rates), not output from the trained model or SHAP analysis. They are provided as internal reference context only.
+- For model-based feature importance (SHAP values, ranked driver significance), refer to the Data Agent's findings for the current run rather than this document.
+- This document does not contain any external industry benchmarks, competitor information, or figures from outside the company's own data. For that kind of context, use the web search tool instead.
