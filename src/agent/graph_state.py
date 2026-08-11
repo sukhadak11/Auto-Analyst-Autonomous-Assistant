@@ -2,19 +2,20 @@
 from typing import TypedDict, List, Annotated
 import operator
 
+from explanation_schema import Explanation
 class AgentState(TypedDict):
-    question: str                          # original business question
-    plan: List[str]                        # sub-tasks the planner creates
-    data_findings: str                     # output from Data Agent
-    research_findings: str                 # output from Research Agent
-    report: str                            # final report from Report Agent
-    messages: List[str] 
-    critique: str                          # <-- new: critic's feedback
-    approved: bool                         # <-- new: "approved" | "rejected" | "needs_revision"   
-    human_decision: str      
-    human_notes: str              # <-- new: whether critic signed off
-    revision_count: int                     # running conversation/log
-
+    question: str
+    plan: List[str]
+    data_findings: str
+    research_findings: str
+    report: str
+    critique: str
+    approved: bool
+    revision_count: int
+    human_decision: str
+    human_notes: str
+    explanations: List[Explanation]   # <-- new: every agent appends here
+    messages: Annotated[list, operator.add]
 
 # quick test
 if __name__ == "__main__":
