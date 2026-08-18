@@ -39,7 +39,7 @@ def research_agent_node(state: AgentState) -> AgentState:
     state["messages"] = state.get("messages", []) + [f"Research Agent findings:\n{findings}"]
     return state
 
-
+'''
 if __name__ == "__main__":
     test_state = {
         "question": "How does our churn risk compare to telecom industry benchmarks?",
@@ -50,3 +50,4 @@ if __name__ == "__main__":
     output = research_agent_node(test_state)
     print("\n=== FINAL STATE ===")
     print(output)
+    '''

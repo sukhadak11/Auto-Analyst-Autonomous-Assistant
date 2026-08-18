@@ -1,4 +1,3 @@
-# src/agent/graph.py
 import sqlite3
 import uuid
 from langgraph.graph import StateGraph, END
@@ -6,82 +5,89 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 
 from graph_state import AgentState
 from planner import plan_node
-from data_agent import data_agent_node
+from profiling_agent import profiling_agent_node
+from cleaning_agent import cleaning_agent_node
+from feature_selection_agent import feature_selection_agent_node
+from model_training_agent import model_training_agent_node
 from research_agent import research_agent_node
 from report_agent import report_agent_node
 from critic_agent import critic_node
 from human_checkpoint import human_checkpoint_node
 
+MAX_REVISIONS = 3
 
-MAX_REVISIONS = 1
 
+# graph.py — add this alongside the existing build_graph()
 
-def route_after_critic(state: AgentState) -> str:
-    if state.get("approved", False):
-        return "end"
-    if state.get("revision_count", 0) >= MAX_REVISIONS:
-        return "end"
-    return "revise"
-
-def build_graph():
+def build_graph_for_api():
+    """Same pipeline as build_graph(), but stops after the Critic instead
+    of calling human_checkpoint_node's blocking input(). The API's
+    /approve endpoint handles human approval instead."""
     graph = StateGraph(AgentState)
 
     graph.add_node("planner", plan_node)
-    graph.add_node("data_agent", data_agent_node)
+    graph.add_node("profiling_agent", profiling_agent_node)
+    graph.add_node("cleaning_agent", cleaning_agent_node)
+    graph.add_node("feature_selection_agent", feature_selection_agent_node)
+    graph.add_node("model_training_agent", model_training_agent_node)
     graph.add_node("research_agent", research_agent_node)
     graph.add_node("report_agent", report_agent_node)
     graph.add_node("critic", critic_node)
-    graph.add_node("human_checkpoint", human_checkpoint_node)   # <-- new
 
     graph.set_entry_point("planner")
-    graph.add_edge("planner", "data_agent")
-    graph.add_edge("data_agent", "research_agent")
+    graph.add_edge("planner", "profiling_agent")
+    graph.add_edge("profiling_agent", "cleaning_agent")
+    graph.add_edge("cleaning_agent", "feature_selection_agent")
+    graph.add_edge("feature_selection_agent", "model_training_agent")
+    graph.add_edge("model_training_agent", "research_agent")
     graph.add_edge("research_agent", "report_agent")
     graph.add_edge("report_agent", "critic")
 
     def route_after_critic(state: AgentState) -> str:
         if state.get("approved", False):
-            return "human_checkpoint"          # clean approval -> still goes to human
+            return "end"
         if state.get("revision_count", 0) >= MAX_REVISIONS:
-            return "human_checkpoint"          # exhausted retries -> human decides
+            return "end"
         return "revise"
 
     graph.add_conditional_edges(
-        "critic",
-        route_after_critic,
-        {"revise": "report_agent", "human_checkpoint": "human_checkpoint"},
+        "critic", route_after_critic,
+        {"revise": "report_agent", "end": END},
     )
-
-    graph.add_edge("human_checkpoint", END)    # <-- terminal node now
 
     conn = sqlite3.connect("data/memory.db", check_same_thread=False)
     checkpointer = SqliteSaver(conn)
     return graph.compile(checkpointer=checkpointer)
 
 if __name__ == "__main__":
-    app = build_graph()
+    app = build_graph_for_api()
 
-    thread_id = f"test_{uuid.uuid4().hex[:8]}"
-    config = {"configurable": {"thread_id": thread_id}}
-    print(f"DEBUG: using thread_id = {thread_id}")
+    job_id = f"run_{uuid.uuid4().hex[:8]}"
+    config = {"configurable": {"thread_id": job_id}}
+    print(f"DEBUG: job_id = {job_id}")
 
     initial_state = {
-    "question": "Why might churn be spiking?",
-    "plan": [], "data_findings": "", "research_findings": "",
-    "report": "", "critique": "", "approved": False, "revision_count": 0,
-    "human_decision": "", "human_notes": "",
-    "messages": [],
-}
-
-    print("DEBUG: initial_state keys =", list(initial_state.keys()))
-    print("DEBUG: question value =", initial_state.get("question"))
+        "question": "Analyze this dataset and summarize the key findings.",
+        "plan": [], "data_findings": "", "research_findings": "", "report": "",
+        "critique": "", "approved": False, "revision_count": 0,
+        "human_decision": "", "human_notes": "",
+        "explanations": [],
+        "raw_path": "data/Excel/telecommunications_churn.csv",  # only manual input needed
+        "clean_path": "",
+        "target_col": "",          # left empty — Profiling Agent fills this in
+        "dataset_type": "",
+        "id_cols": [],
+        "needs_interpretability": True,
+        "model_path": "", "model_name": "",
+        "job_id": job_id,
+        "messages": [],
+    }
 
     final_state = app.invoke(initial_state, config=config)
 
-    print("\n=== FINAL REPORT ===\n")
-    print(final_state["report"])
-    print("\n=== CRITIC VERDICT ===\n")
-    print(final_state["critique"])
-    print("\nApproved:", final_state["approved"])
-    print("Revisions used:", final_state["revision_count"])
-    print("\nFinal human decision:", final_state.get("human_decision"))
+    print("\n=== ALL EXPLANATIONS LOGGED ===")
+    for e in final_state["explanations"]:
+        print(f"- {e['action']} (confidence: {e['confidence']})")
+
+    print("\n=== FINAL REPORT ===")
+    print(final_state.get("report", "No report generated."))

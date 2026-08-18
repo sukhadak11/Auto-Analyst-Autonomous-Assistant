@@ -14,15 +14,17 @@ analyze_and_clean = cleaning_logic.analyze_and_clean
 
 
 def cleaning_agent_node(state: AgentState) -> AgentState:
-    raw_path = state.get("raw_path", "data/raw_data.csv")
-    target_col = state.get("target_col", "churn")
+    raw_path = state.get("raw_path")
+    target_col = state.get("target_col")
+    job_id = state.get("job_id")
 
     df = pd.read_csv(raw_path)
     cleaned_df, explanations = analyze_and_clean(df, target_col)
 
-    clean_path = "data/clean_data.csv"
+    clean_path = f"data/clean_data_{job_id}.csv"
     cleaned_df.to_csv(clean_path, index=False)
 
+    state["clean_path"] = clean_path 
     state["explanations"] = state.get("explanations", []) + explanations
     state["data_findings"] = state.get("data_findings", "") + \
         f"\nCleaning complete: {cleaned_df.shape[0]} rows, {cleaned_df.shape[1]} columns.\n" + \
@@ -32,6 +34,12 @@ def cleaning_agent_node(state: AgentState) -> AgentState:
 
 # quick test at the bottom of cleaning_agent.py
 if __name__ == "__main__":
-    test_state = {"raw_path": "data/telecommunications_churn.csv", "target_col": "churn", "explanations": [], "messages": []}
+    test_state = {
+        "raw_path": "data\\Excel\\loan prediction.csv",
+        "target_col": "Loan_Status",
+        "job_id": "loan_test",   # <-- add this
+        "explanations": [], "messages": []
+    }
     result = cleaning_agent_node(test_state)
     print(result["data_findings"])
+    print("Clean path:", result["clean_path"])   # <-- add this so you can SEE exactly what path was used

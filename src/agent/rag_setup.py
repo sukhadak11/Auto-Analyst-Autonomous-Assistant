@@ -6,7 +6,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 
-KB_DIR = Path("data/knowledge_base")
+#KB_DIR = Path("data/knowledge_base")
 PERSIST_DIR = Path("data/chroma_db")
 
 def build_vector_store():

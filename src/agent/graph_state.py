@@ -14,9 +14,20 @@ class AgentState(TypedDict):
     revision_count: int
     human_decision: str
     human_notes: str
-    explanations: List[Explanation]   # <-- new: every agent appends here
+    explanations: List[Explanation]
+    raw_path: str
+    clean_path: str
+    target_col: str
+    dataset_type: str
+    id_cols: List[str]
+    needs_interpretability: bool
+    model_path: str
+    model_name: str
+    job_id: str
     messages: Annotated[list, operator.add]
 
+
+'''
 # quick test
 if __name__ == "__main__":
     test_state: AgentState = {
@@ -26,3 +37,4 @@ if __name__ == "__main__":
         "critique": "", "approved": False, "revision_count": 0
     }
     print(test_state["data_findings"])
+    '''

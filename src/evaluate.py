@@ -88,10 +88,11 @@ def explain_one_prediction(explainer, X: pd.DataFrame, row_index: int = 0):
     plt.close()
     print(f"Saved: {PLOTS_DIR / f'local_explanation_row{row_index}.png'}")
 
-
+'''
 if __name__ == "__main__":
     target_col = "churn"  
     model, X, y = load_model_and_data(target_col)
     describe_dataset(X, y, target_col)
     explainer, explanation = explain_global(model, X)
     explain_one_prediction(explainer, X, row_index=0)
+    '''

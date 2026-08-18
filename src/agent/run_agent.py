@@ -19,10 +19,11 @@ def ask(question: str):
     print(final_message.content)
     return result
 
-
+'''
 if __name__ == "__main__":
     ask(
         "Why might churn be spiking? Clean the data, train a model, "
         "explain what's driving churn, and check how our churn rate "
         "compares to typical telecom industry benchmarks."
     )
+    '''

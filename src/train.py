@@ -44,6 +44,7 @@ def train_and_evaluate(target_col: str):
     print(f"\nModel saved to {MODEL_PATH}")
 
     return model, X_test, y_test
-
+'''
 if __name__ == "__main__":
-    train_and_evaluate(target_col="churn")  
+    train_and_evaluate(target_col="churn")
+'''  

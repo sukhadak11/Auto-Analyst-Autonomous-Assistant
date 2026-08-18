@@ -29,6 +29,7 @@ def plan_node(state: AgentState) -> AgentState:
     state["plan"] = plan_lines
     state["messages"] = state.get("messages", []) + [f"Planner created plan:\n{response.content}"]
     return state
+'''
 # quick test
 if __name__ == "__main__":
     test_state: AgentState = {
@@ -41,3 +42,4 @@ if __name__ == "__main__":
     }
     result = plan_node(test_state)
     print(result["plan"])
+    '''

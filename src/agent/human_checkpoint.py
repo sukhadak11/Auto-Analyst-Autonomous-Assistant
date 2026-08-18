@@ -37,7 +37,7 @@ def human_checkpoint_node(state: AgentState) -> AgentState:
         f"Human checkpoint decision: {state['human_decision']}"
     ]
     return state
-
+'''
 if __name__ == "__main__":
     fake_state = {
         "question": "Why is churn spiking?",
@@ -49,3 +49,4 @@ if __name__ == "__main__":
     }
     result = human_checkpoint_node(fake_state)
     print("\nFinal state human_decision:", result["human_decision"])
+    '''

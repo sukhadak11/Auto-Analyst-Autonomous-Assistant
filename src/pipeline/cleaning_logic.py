@@ -1,4 +1,10 @@
 # src/pipeline/cleaning_logic.py
+import sys
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parents[1] / "agent"))
+
+
 import pandas as pd
 from explanation_schema import make_explanation
 
@@ -7,7 +13,7 @@ def analyze_and_clean(df: pd.DataFrame, target_col: str):
     df = df.copy()
     explanations = []
 
-    # 1. Duplicate rows check
+    # 1. Duplicate rows check — not a judgment call, so no invented confidence
     dup_count = df.duplicated().sum()
     if dup_count > 0:
         df = df.drop_duplicates()
@@ -18,6 +24,7 @@ def analyze_and_clean(df: pd.DataFrame, target_col: str):
             why_not_chosen="Duplicate rows can bias the model by over-weighting repeated examples.",
             expected_impact=f"Dataset reduced from {len(df)+dup_count} to {len(df)} rows.",
             learning_note="Duplicate records are a common data quality issue and should be checked before training any model.",
+            confidence="High",  # an exact-match duplicate is unambiguous fact, not a guess
         ))
     else:
         explanations.append(make_explanation(
@@ -27,6 +34,7 @@ def analyze_and_clean(df: pd.DataFrame, target_col: str):
             why_not_chosen="N/A — no duplicates existed.",
             expected_impact="No change to dataset size.",
             learning_note="Checking for duplicates is a standard first step, even when the result is 'none found.'",
+            confidence="N/A",  # not a judgment call — there's nothing to be confident/unconfident about
         ))
 
     # 2. Class balance check (only if target looks categorical/binary)
@@ -35,6 +43,16 @@ def analyze_and_clean(df: pd.DataFrame, target_col: str):
         if len(value_counts) <= 10:  # treat as categorical target
             minority_pct = value_counts.min()
             if minority_pct < 0.25:
+                # confidence based on how far below the 25% threshold the minority class is —
+                # the further below, the more clearly this is a real imbalance problem
+                gap = 0.25 - minority_pct
+                if gap > 0.15:
+                    confidence = "High"
+                elif gap > 0.05:
+                    confidence = "Medium"
+                else:
+                    confidence = "Low"
+
                 explanations.append(make_explanation(
                     action="Flagged class imbalance in target column",
                     reason=f"The minority class in '{target_col}' makes up only {minority_pct:.1%} of the data.",
@@ -42,9 +60,10 @@ def analyze_and_clean(df: pd.DataFrame, target_col: str):
                     why_not_chosen="Not applied automatically in this step — flagged for awareness; the Model Training Agent will account for this when evaluating the model.",
                     expected_impact="Without adjustment, the model may be biased toward predicting the majority class.",
                     learning_note="A minority class under 25-30% often needs special handling (class weights, oversampling) to train a fair model.",
+                    confidence=confidence,
                 ))
 
-    # 3. Constant / near-constant columns
+    # 3. Constant / near-constant columns — unambiguous fact, always High
     for col in df.columns:
         if col == target_col:
             continue
@@ -56,9 +75,10 @@ def analyze_and_clean(df: pd.DataFrame, target_col: str):
                 why_not_chosen="Not dropped automatically — flagged for awareness; constant columns add no predictive value but are left for the user to confirm removal.",
                 expected_impact="This column contributes no information to the model and can likely be safely removed.",
                 learning_note="Constant columns carry zero variance and cannot help a model distinguish between outcomes.",
+                confidence="High",  # nunique <= 1 is a directly observed fact, not an inference
             ))
 
-    # 4. Missing value handling (from before)
+    # 4. Missing value handling — numeric columns
     num_cols = [c for c in df.select_dtypes(include="number").columns if c != target_col]
     cat_cols = [c for c in df.select_dtypes(include="object").columns if c != target_col]
 
@@ -66,11 +86,24 @@ def analyze_and_clean(df: pd.DataFrame, target_col: str):
         missing_count = df[col].isna().sum()
         if missing_count == 0:
             continue
+
         skew = df[col].skew()
         use_median = abs(skew) > 0.5
+
+        # confidence based on how far the skew is from the 0.5 threshold —
+        # a skew far from the cutoff is a clear-cut case, close to it is borderline
+        distance_from_threshold = abs(abs(skew) - 0.5)
+        if distance_from_threshold > 1.0:
+            confidence = "High"
+        elif distance_from_threshold > 0.3:
+            confidence = "Medium"
+        else:
+            confidence = "Low"
+
         fill_value = df[col].median() if use_median else df[col].mean()
         method = "Median imputation" if use_median else "Mean imputation"
         df[col] = df[col].fillna(fill_value)
+
         explanations.append(make_explanation(
             action=f"{method} on column '{col}'",
             reason=f"Column '{col}' has a skewness of {skew:.2f}.",
@@ -78,20 +111,65 @@ def analyze_and_clean(df: pd.DataFrame, target_col: str):
             why_not_chosen="Sensitive to outliers." if use_median else "Discards distribution shape when data is symmetric.",
             expected_impact=f"Filled {missing_count} missing values.",
             learning_note="Median is preferred over mean when a column is skewed.",
+            confidence=confidence,
         ))
 
+    # 5. Missing value handling — categorical columns
     for col in cat_cols:
         missing_count = df[col].isna().sum()
         if missing_count == 0:
             continue
+
+        # confidence based on how much of the column was missing —
+        # a small gap is a safe, low-risk fill; a large gap is a bigger intervention
+        pct_missing = missing_count / len(df)
+        if pct_missing < 0.02:
+            confidence = "High"
+        elif pct_missing < 0.08:
+            confidence = "Medium"
+        else:
+            confidence = "Low"
+
         df[col] = df[col].fillna("Unknown")
         explanations.append(make_explanation(
             action=f"Filled missing values in '{col}' with 'Unknown'",
-            reason=f"'{col}' had {missing_count} missing values.",
+            reason=f"'{col}' had {missing_count} missing values ({pct_missing:.1%} of rows).",
             alternative_considered="Mode imputation",
             why_not_chosen="Can bias toward the majority category.",
-            expected_impact=f"Retained all rows.",
+            expected_impact="Retained all rows.",
             learning_note="An explicit 'Unknown' category preserves the missingness signal.",
+            confidence=confidence,
         ))
 
     return df, explanations
+
+
+def detect_outliers(df: pd.DataFrame, target_col: str):
+    """Flags numeric columns with outliers using the IQR method — computed
+    fresh from whatever data is passed in, for every numeric column present."""
+    explanations = []
+    num_cols = [c for c in df.select_dtypes(include="number").columns if c != target_col]
+
+    for col in num_cols:
+        q1, q3 = df[col].quantile(0.25), df[col].quantile(0.75)
+        iqr = q3 - q1
+        lower, upper = q1 - 1.5 * iqr, q3 + 1.5 * iqr
+        outlier_count = ((df[col] < lower) | (df[col] > upper)).sum()
+
+        if outlier_count == 0:
+            continue
+
+        pct = outlier_count / len(df)
+        confidence = "High" if pct < 0.02 else "Medium" if pct < 0.05 else "Low"
+
+        explanations.append(make_explanation(
+            action=f"Flagged {outlier_count} outlier(s) in '{col}' (not removed automatically)",
+            reason=f"Using the IQR method: values outside [{lower:.2f}, {upper:.2f}] for '{col}' are statistical outliers ({pct:.1%} of rows).",
+            alternative_considered="Automatically remove or cap these values",
+            why_not_chosen="Outliers are flagged rather than removed automatically, since removing real data points without domain context can discard legitimate extreme cases.",
+            expected_impact="These rows remain in the dataset; the Model Training Agent will be informed they exist in case model performance is affected.",
+            learning_note="The IQR method flags values more than 1.5x the interquartile range beyond the 25th/75th percentiles — a standard, distribution-agnostic way to spot outliers.",
+            confidence=confidence,
+        ))
+
+    return explanations
