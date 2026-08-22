@@ -11,7 +11,12 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.pipeline import make_pipeline
 from sklearn.metrics import roc_auc_score, accuracy_score, r2_score
-from explanation_schema import make_explanation
+
+try:
+    from explanation_schema import make_explanation  # type: ignore[reportMissingImports]
+except ImportError:
+    def make_explanation(**kwargs):
+        return kwargs
 
 try:
     from xgboost import XGBClassifier, XGBRegressor
@@ -61,13 +66,15 @@ def encode_categoricals(df: pd.DataFrame, target_col: str):
 
 
 def encode_target_if_needed(y: pd.Series, target_col: str):
+    print(f"DEBUG: encode_target_if_needed called. y.dtype = {y.dtype}, sample values = {y.unique()[:5]}")
     explanations = []
 
     if y.dtype == "object":
-        original_classes = sorted(y.dropna().unique().tolist())
+        print("DEBUG: target IS object type, encoding now...")
         encoder = LabelEncoder()
-        y_encoded = pd.Series(encoder.fit_transform(y), index=y.index)
-        mapping = {cls: int(code) for cls, code in zip(encoder.classes_, encoder.transform(encoder.classes_))}
+        y_encoded = encoder.fit_transform(y)
+        original_classes = y.unique()
+        mapping = dict(zip(original_classes, encoder.classes_))
 
         explanations.append(make_explanation(
             action=f"Encoded target column '{target_col}' from text labels to numeric",

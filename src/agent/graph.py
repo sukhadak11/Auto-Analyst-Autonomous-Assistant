@@ -3,16 +3,16 @@ import uuid
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.sqlite import SqliteSaver
 
-from graph_state import AgentState
-from planner import plan_node
-from profiling_agent import profiling_agent_node
-from cleaning_agent import cleaning_agent_node
-from feature_selection_agent import feature_selection_agent_node
-from model_training_agent import model_training_agent_node
-from research_agent import research_agent_node
-from report_agent import report_agent_node
-from critic_agent import critic_node
-from human_checkpoint import human_checkpoint_node
+from src.agent.graph_state import AgentState
+from src.agent.planner import plan_node
+from src.agent.profiling_agent import profiling_agent_node
+from src.agent.cleaning_agent import cleaning_agent_node
+from src.agent.feature_selection_agent import feature_selection_agent_node
+from src.agent.model_training_agent import model_training_agent_node
+from src.agent.research_agent import research_agent_node
+from src.agent.report_agent import report_agent_node
+from src.agent.critic_agent import critic_node
+from src.agent.human_checkpoint import human_checkpoint_node
 
 MAX_REVISIONS = 3
 

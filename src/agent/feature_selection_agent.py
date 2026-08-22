@@ -2,9 +2,9 @@ import pandas as pd
 from pathlib import Path
 import sys
 sys.path.append(str(Path(__file__).resolve().parents[1] / "pipeline"))
-from feature_selection_logic import analyze_and_select_features
-from explanation_schema import format_explanations
-from graph_state import AgentState
+from src.pipeline.feature_selection_logic import analyze_and_select_features
+from src.agent.explanation_schema import format_explanations
+from src.agent.graph_state import AgentState
 
 
 def feature_selection_agent_node(state: AgentState) -> AgentState:

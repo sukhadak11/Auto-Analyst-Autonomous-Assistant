@@ -1,5 +1,5 @@
 # src/agent/human_checkpoint.py
-from graph_state import AgentState
+from src.agent.graph_state import AgentState
 
 def human_checkpoint_node(state: AgentState) -> AgentState:
     print("\n" + "=" * 60)

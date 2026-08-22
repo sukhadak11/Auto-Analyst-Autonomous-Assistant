@@ -6,7 +6,7 @@ from llm_config import safe_invoke
 from pathlib import Path
 import sys
 sys.path.append(str(Path(__file__).resolve().parents[1] / "pipeline"))
-from report_formatting import (
+from src.pipeline.report_formatting import (
     format_analytical_decisions,
     format_educational_insights,
     format_confidence_assessment,

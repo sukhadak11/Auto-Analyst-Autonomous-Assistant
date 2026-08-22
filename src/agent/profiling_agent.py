@@ -3,9 +3,9 @@ import pandas as pd
 from pathlib import Path
 import sys
 sys.path.append(str(Path(__file__).resolve().parents[1] / "pipeline"))
-from profiling_logic import profile_dataset
-from explanation_schema import format_explanations
-from graph_state import AgentState
+from src.pipeline.profiling_logic import profile_dataset
+from src.agent.explanation_schema import format_explanations
+from src.agent.graph_state import AgentState
 
 
 def profiling_agent_node(state: AgentState) -> AgentState:

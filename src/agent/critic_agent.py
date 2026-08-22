@@ -1,8 +1,8 @@
 # critic_agent.py
 import os
 from langchain_groq import ChatGroq
-from graph_state import AgentState
-from llm_config import safe_invoke
+from src.agent.graph_state import AgentState
+from src.agent.llm_config import safe_invoke
 
 critic_llm = ChatGroq(
     model="openai/gpt-oss-20b",

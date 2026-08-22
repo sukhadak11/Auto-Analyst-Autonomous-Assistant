@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
-from graph_state import AgentState
+from src.agent.graph_state import AgentState
 from tools import run_data_cleaning, run_model_training, run_shap_explanation
 from llm_config import llm
 from llm_config import safe_invoke

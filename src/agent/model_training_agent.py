@@ -1,8 +1,8 @@
 import pandas as pd
 import joblib
 from pathlib import Path
-from graph_state import AgentState
-from explanation_schema import format_explanations
+from src.agent.graph_state import AgentState
+from src.agent.explanation_schema import format_explanations
 import sys
 sys.path.append(str(Path(__file__).resolve().parents[1] / "pipeline"))
 from model_training_logic import train_and_compare_models

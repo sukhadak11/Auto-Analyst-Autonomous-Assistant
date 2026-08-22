@@ -1,8 +1,8 @@
 # src/agent/cleaning_agent.py
 import pandas as pd
 from pathlib import Path
-from graph_state import AgentState
-from explanation_schema import format_explanations
+from src.agent.graph_state import AgentState
+from src.agent.explanation_schema import format_explanations
 import importlib.util
 
 # Dynamically load pipeline/cleaning_logic.py to avoid relying on sys.path
