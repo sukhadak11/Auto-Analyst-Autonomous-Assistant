@@ -1,6 +1,7 @@
 # src/pipeline/model_training_logic.py
 import sys
 from pathlib import Path
+from llm_config import llm, safe_invoke
 sys.path.append(str(Path(__file__).resolve().parents[1] / "agent"))
 
 import pandas as pd
@@ -29,12 +30,11 @@ TOLERANCE = 0.03
 
 
 def detect_problem_type(y: pd.Series) -> str:
-    if y.dtype == "object" or y.nunique() <= 10:
+    is_text = y.dtype == "object" or pd.api.types.is_string_dtype(y)
+    if is_text or y.nunique() <= 10:
         return "classification"
     return "regression"
-
-
-def encode_categoricals(df: pd.DataFrame, target_col: str):
+def encode_categoricals(df: pd.DataFrame, target_col: str | bytes):
     cat_cols = [c for c in df.select_dtypes(include="object").columns if c != target_col]
     explanations = []
 
@@ -66,15 +66,16 @@ def encode_categoricals(df: pd.DataFrame, target_col: str):
 
 
 def encode_target_if_needed(y: pd.Series, target_col: str):
-    print(f"DEBUG: encode_target_if_needed called. y.dtype = {y.dtype}, sample values = {y.unique()[:5]}")
     explanations = []
 
-    if y.dtype == "object":
-        print("DEBUG: target IS object type, encoding now...")
+    # Catch classic 'object' dtype AND pandas' newer nullable string dtype
+    is_text = y.dtype == "object" or pd.api.types.is_string_dtype(y)
+
+    if is_text:
+        original_classes = sorted(y.dropna().unique().tolist())
         encoder = LabelEncoder()
-        y_encoded = encoder.fit_transform(y)
-        original_classes = y.unique()
-        mapping = dict(zip(original_classes, encoder.classes_))
+        y_encoded = pd.Series(encoder.fit_transform(y.astype(str)), index=y.index)
+        mapping = {cls: int(code) for cls, code in zip(encoder.classes_, encoder.transform(encoder.classes_))}
 
         explanations.append(make_explanation(
             action=f"Encoded target column '{target_col}' from text labels to numeric",
@@ -82,13 +83,12 @@ def encode_target_if_needed(y: pd.Series, target_col: str):
             alternative_considered="Leave as text labels",
             why_not_chosen="Several candidate models cannot train on non-numeric target labels.",
             expected_impact=f"Mapping applied: {mapping}.",
-            learning_note="Classification targets are commonly stored as text (e.g. 'Yes'/'No') but need numeric encoding for many ML libraries to process them.",
+            learning_note="Classification targets are commonly stored as text but need numeric encoding for many ML libraries to process them.",
             confidence="High",
         ))
         return y_encoded, explanations, encoder
 
     return y, explanations, None
-
 
 def train_and_compare_models(df: pd.DataFrame, target_col: str, needs_interpretability: bool = True):
     explanations = []

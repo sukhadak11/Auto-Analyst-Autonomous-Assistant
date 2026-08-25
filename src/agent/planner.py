@@ -2,8 +2,7 @@ import os
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from src.agent.graph_state import AgentState
-from src.agent.llm_config import llm, safe_invoke
-
+from llm_config import llm, safe_invoke
 load_dotenv()
 
 
@@ -28,17 +27,3 @@ def plan_node(state: AgentState) -> AgentState:
     state["plan"] = plan_lines
     state["messages"] = state.get("messages", []) + [f"Planner created plan:\n{response.content}"]
     return state
-'''
-# quick test
-if __name__ == "__main__":
-    test_state: AgentState = {
-        "question": "Why might churn be spiking, and how does it compare to industry benchmarks?",
-        "plan": [],
-        "data_findings": "",
-        "research_findings": "",
-        "report": "",
-        "messages": [],
-    }
-    result = plan_node(test_state)
-    print(result["plan"])
-    '''

@@ -1,11 +1,12 @@
 import sys
 from pathlib import Path
+from llm_config import llm, safe_invoke
 sys.path.append(str(Path(__file__).resolve().parents[1] / "agent"))
 import pandas as pd
-from explanation_schema import make_explanation
+from src.agent.explanation_schema import make_explanation
 
 
-def detect_target_column(df: pd.DataFrame, user_specified: str = None) -> tuple:
+def detect_target_column(df: pd.DataFrame, user_specified: str | bytes) -> tuple:
     """Returns (target_col, explanation). Never hardcodes a column name."""
     if user_specified and user_specified in df.columns:
         return user_specified, make_explanation(
@@ -92,7 +93,7 @@ def detect_dataset_type(df: pd.DataFrame) -> tuple:
     )
 
 
-def detect_id_columns(df: pd.DataFrame, target_col: str) -> tuple:
+def detect_id_columns(df: pd.DataFrame, target_col: str | bytes) -> tuple:
     """Flags columns that look like identifiers, not predictive features."""
     id_cols = []
     for col in df.columns:
@@ -123,7 +124,7 @@ def detect_id_columns(df: pd.DataFrame, target_col: str) -> tuple:
     )
 
 
-def profile_dataset(df: pd.DataFrame, user_specified_target: str = None) -> dict:
+def profile_dataset(df: pd.DataFrame, user_specified_target: str | bytes) -> dict:
     """The single entry point — runs all profiling steps and returns a
     full profile plus every explanation generated along the way."""
     explanations = []

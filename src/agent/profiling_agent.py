@@ -8,6 +8,7 @@ from src.agent.explanation_schema import format_explanations
 from src.agent.graph_state import AgentState
 
 
+
 def profiling_agent_node(state: AgentState) -> AgentState:
     raw_path = state["raw_path"]
     user_target = state.get("user_specified_target")
@@ -26,9 +27,10 @@ def profiling_agent_node(state: AgentState) -> AgentState:
     state["messages"] = state.get("messages", []) + ["Profiling Agent: dataset analyzed dynamically."]
     return state
 
-
+'''
 if __name__ == "__main__":
     # test with NO target/dataset assumptions hardcoded — only the file path
     test_state = {"raw_path": "data/telecommunications_churn.csv", "explanations": [], "messages": []}
     result = profiling_agent_node(test_state)
     print(result["data_findings"])
+'''

@@ -6,7 +6,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1] / "agent"))
 import pandas as pd
 import numpy as np
 from sklearn.decomposition import PCA
-from explanation_schema import make_explanation
+from src.agent.explanation_schema import make_explanation
 
 
 def analyze_and_select_features(df: pd.DataFrame, target_col: str, needs_interpretability: bool = True):

@@ -13,7 +13,7 @@ PLOTS_DIR = Path("data/plots")
 PLOTS_DIR.mkdir(exist_ok=True)
 
 
-def load_model_and_data(target_col: str):
+def load_model_and_data(target_col: str | bytes) -> tuple:
     model = joblib.load(MODEL_PATH)
     df = pd.read_csv(CLEAN_PATH)
     X = df.drop(columns=[target_col])
@@ -21,7 +21,7 @@ def load_model_and_data(target_col: str):
     return model, X, y
 
 
-def describe_dataset(X: pd.DataFrame, y: pd.Series, target_col: str):
+def describe_dataset(X: pd.DataFrame, y: pd.Series, target_col: str | bytes):
     """Print a full summary so nothing about the dataset is left undefined."""
     print("=" * 60)
     print("DATASET SUMMARY")
@@ -88,11 +88,4 @@ def explain_one_prediction(explainer, X: pd.DataFrame, row_index: int = 0):
     plt.close()
     print(f"Saved: {PLOTS_DIR / f'local_explanation_row{row_index}.png'}")
 
-'''
-if __name__ == "__main__":
-    target_col = "churn"  
-    model, X, y = load_model_and_data(target_col)
-    describe_dataset(X, y, target_col)
-    explainer, explanation = explain_global(model, X)
-    explain_one_prediction(explainer, X, row_index=0)
-    '''
+    return explanation

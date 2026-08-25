@@ -12,7 +12,6 @@ from src.agent.model_training_agent import model_training_agent_node
 from src.agent.research_agent import research_agent_node
 from src.agent.report_agent import report_agent_node
 from src.agent.critic_agent import critic_node
-from src.agent.human_checkpoint import human_checkpoint_node
 
 MAX_REVISIONS = 3
 
@@ -62,7 +61,7 @@ def build_graph_for_api():
 if __name__ == "__main__":
     app = build_graph_for_api()
 
-    job_id = f"run_{uuid.uuid4().hex[:8]}"
+    job_id = f"run_{uuid.uuid4().hex[:16]}"
     config = {"configurable": {"thread_id": job_id}}
     print(f"DEBUG: job_id = {job_id}")
 

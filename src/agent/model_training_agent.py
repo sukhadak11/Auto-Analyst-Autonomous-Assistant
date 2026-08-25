@@ -5,7 +5,7 @@ from src.agent.graph_state import AgentState
 from src.agent.explanation_schema import format_explanations
 import sys
 sys.path.append(str(Path(__file__).resolve().parents[1] / "pipeline"))
-from model_training_logic import train_and_compare_models
+from src.pipeline.model_training_logic import train_and_compare_models
 
 
 def model_training_agent_node(state: AgentState) -> AgentState:
@@ -28,17 +28,3 @@ def model_training_agent_node(state: AgentState) -> AgentState:
     state["data_findings"] = state.get("data_findings", "") + "\n" + format_explanations(explanations)
     state["messages"] = state.get("messages", []) + [f"Model Training Agent: selected {model_name}."]
     return state
-
-'''
-if __name__ == "__main__":
-    test_state = {
-        "target_col": "churn",
-        "clean_path": "data/clean_data_telecom_test.csv",
-        "needs_interpretability": True,
-        "job_id": "telecom_test",
-        "explanations": [], "messages": []
-    }
-    result = model_training_agent_node(test_state)
-    print(result["data_findings"])
-    print("Model saved to:", result["model_path"])
-    '''

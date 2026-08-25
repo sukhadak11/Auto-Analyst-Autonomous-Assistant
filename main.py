@@ -1,5 +1,5 @@
 # main.py — FastAPI entry point for AutoAnalyst
-# Run with: uvicorn main:app --reload --port 8000
+# Run with: uvicorn main:app --reload --port 8001
 
 import shutil
 import threading
@@ -241,4 +241,4 @@ def approve_report(
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
