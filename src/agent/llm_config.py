@@ -1,35 +1,54 @@
 # src/agent/llm_config.py
 import os
 import time
-import re
+import logging
+from pathlib import Path
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
-from groq import RateLimitError, APIStatusError
+from groq import RateLimitError, APIStatusError, NotFoundError
 
-load_dotenv()
+# Explicitly locate .env relative to this file, not the cwd
+env_path = Path(__file__).resolve().parents[2] / ".env"  # adjust levels as needed
+load_dotenv(dotenv_path=env_path)
+
+api_key = os.getenv("GROQ_API_KEY")
+if not api_key:
+    raise RuntimeError(
+        f"GROQ_API_KEY not found. Looked for .env at: {env_path}. "
+        "Make sure the .env file exists and contains GROQ_API_KEY=..."
+    )
 
 llm = ChatGroq(
-    model="llama-3.1-8b-instant",
-    api_key=os.getenv("GROQ_API_KEY"),
+    model="openai/gpt-oss-20b",
+    api_key=api_key,
     temperature=0,
 )
 
-#tighten wait times for per-minute limits specifically
-def safe_invoke(agent_or_llm, input_data, max_attempts=4):
-    for attempt in range(max_attempts):
+def safe_invoke(llm, prompt, max_retries=3):
+    last_exception = None
+    for attempt in range(max_retries):
         try:
-            return agent_or_llm.invoke(input_data)
+            response = llm.invoke(prompt)
+
+            if response is None:
+                raise ValueError("LLM/agent returned None")
+
+            # react agents return a dict like {"messages": [...]}
+            if isinstance(response, dict):
+                if not response.get("messages"):
+                    raise ValueError(f"Agent returned no messages: {response!r}")
+            # normal chat models return an object with .content
+            elif getattr(response, "content", None) is None:
+                raise ValueError(f"LLM returned empty/invalid response: {response!r}")
+
+            return response
         except (RateLimitError, APIStatusError) as e:
-            msg = str(e)
-            if "tokens per day" in msg.lower() or "TPD" in msg:
-                raise RuntimeError(f"Daily quota exhausted:\n{msg}")  
-            match = re.search(r"try again in ([\d.]+)(ms|s|m)", msg)
-            if match:
-                value, unit = float(match.group(1)), match.group(2)
-                wait_seconds = value / 1000 if unit == "ms" else value * 60 if unit == "m" else value
-            else:
-                wait_seconds = 10
-            wait_seconds = min(max(wait_seconds, 2) + 1, 30)  # cap wait at 30s max
-            print(f"Waiting {wait_seconds:.1f}s...")
-            time.sleep(wait_seconds)
-    raise RuntimeError("Exceeded max retry attempts.")
+            last_exception = e
+            logging.warning(f"Attempt {attempt+1}/{max_retries} failed (API error): {type(e).__name__}: {e}")
+            time.sleep(11)
+        except Exception as e:
+            last_exception = e
+            logging.warning(f"Attempt {attempt+1}/{max_retries} failed: {type(e).__name__}: {e}")
+            time.sleep(5)
+
+    raise RuntimeError(f"Exceeded max retry attempts. Last error: {last_exception}") from last_exception

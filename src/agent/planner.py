@@ -24,7 +24,7 @@ Respond with a numbered list of sub-tasks only.
 
 def plan_node(state: AgentState) -> AgentState:
     prompt = PLANNER_PROMPT.format(question=state["question"])
-    response = safe_invoke(llm, prompt)   
+    response = safe_invoke(llm, prompt)
     plan_lines = [line.strip() for line in response.content.split("\n") if line.strip()]
     state["plan"] = plan_lines
     state["messages"] = state.get("messages", []) + [f"Planner created plan:\n{response.content}"]

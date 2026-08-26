@@ -1,11 +1,10 @@
-import os
-from dotenv import load_dotenv
 from langchain_groq import ChatGroq
-from llm_config import llm
+import os
 
-load_dotenv()
+llm = ChatGroq(
+    model="llama-3.1-70b-versatile",
+    api_key=os.getenv("GROQ_API_KEY"),
+    temperature=0
+)
 
-
-if __name__ == "__main__":
-    response = llm.invoke("Say hello and confirm you're working.")
-    print(response.content)
+print(llm.invoke("Hello"))

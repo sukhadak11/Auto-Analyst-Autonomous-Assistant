@@ -5,7 +5,7 @@ from graph_state import AgentState
 from llm_config import safe_invoke
 
 critic_llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
+    model="openai/gpt-oss-20b",
     api_key=os.getenv("GROQ_API_KEY"),
     temperature=0,
 )
