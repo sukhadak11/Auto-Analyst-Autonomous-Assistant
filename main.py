@@ -97,12 +97,6 @@ def run_pipeline(job_id: str, saved_path: Path, question: str, target_column: st
     finally:
         db.close()
 
-
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
-
-
 @app.post("/upload")
 async def upload_dataset(
     file: UploadFile = File(...),

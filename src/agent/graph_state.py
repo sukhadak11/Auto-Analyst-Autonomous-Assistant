@@ -24,8 +24,8 @@ class AgentState(TypedDict):
     model_path: str
     model_name: str
     job_id: str
+    feature_importance: List[tuple]
     messages: Annotated[list, operator.add]
-
 
 '''
 # quick test
