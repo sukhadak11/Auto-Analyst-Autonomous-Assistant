@@ -2,7 +2,7 @@
 from typing import TypedDict, List, Annotated
 import operator
 
-from src.agent.explanation_schema import Explanation
+from explanation_schema import Explanation
 class AgentState(TypedDict):
     question: str
     plan: List[str]

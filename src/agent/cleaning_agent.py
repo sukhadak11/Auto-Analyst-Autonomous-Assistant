@@ -31,7 +31,7 @@ def cleaning_agent_node(state: AgentState) -> AgentState:
         format_explanations(explanations)
     state["messages"] = state.get("messages", []) + [f"Cleaning Agent: {len(explanations)} decisions logged."]
     return state
-
+'''
 # quick test at the bottom of cleaning_agent.py
 if __name__ == "__main__":
     test_state = {
@@ -43,3 +43,4 @@ if __name__ == "__main__":
     result = cleaning_agent_node(test_state)
     print(result["data_findings"])
     print("Clean path:", result["clean_path"])   # <-- add this so you can SEE exactly what path was used
+    '''
