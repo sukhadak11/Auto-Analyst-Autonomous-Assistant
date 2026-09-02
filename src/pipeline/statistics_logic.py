@@ -62,7 +62,7 @@ def compute_statistical_insights(df: pd.DataFrame, target_col: str, question: st
             if len(groups) < 2:
                 continue
             f_stat, p = stats.f_oneway(*groups)
-            correlations.append((col, f_stat, p))
+            correlations.append((col, float(f_stat), float(p)))  # <-- cast both to plain float
         test_name = "One-way ANOVA F-test"
         test_reason = f"the target has {df[target_col].nunique()} categories, so a pairwise correlation isn't appropriate — ANOVA tests whether each feature's mean differs significantly across all categories at once"
 
@@ -96,3 +96,9 @@ def compute_statistical_insights(df: pd.DataFrame, target_col: str, question: st
         ))
 
     return insights, explanations
+
+def to_python_native(value):
+    """Converts numpy scalar types to plain Python types for JSON/msgpack safety."""
+    if hasattr(value, "item"):  # numpy scalars have .item()
+        return value.item()
+    return value

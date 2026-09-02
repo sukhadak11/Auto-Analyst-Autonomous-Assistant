@@ -633,197 +633,59 @@ def train_and_compare_models(
 # SHAP MODEL EXPLANATION
 # -------------------------------------------------------------------
 
-def explain_model(
-    chosen_model,
-    chosen_name,
-    X_train,
-    X_test
-):
-
-    """
-    Computes real SHAP-based feature importance from
-    the trained model.
-
-    Returns:
-        feature_importance:
-            Ranked list of (feature, importance)
-
-        explanations:
-            Structured Action -> Reason -> Alternative ->
-            Why Not -> Expected Impact -> Learning Note ->
-            Confidence explanation.
-    """
-
+def explain_model(chosen_model, chosen_name, X_train, X_test):
     explanations = []
 
     try:
+        if chosen_name in ("Random Forest", "XGBoost", "Decision Tree"):
+            explainer = shap.TreeExplainer(chosen_model)
+            shap_values = explainer.shap_values(X_test)
 
-        # -----------------------------------------------------------
-        # Tree-based models
-        # -----------------------------------------------------------
-
-        if chosen_name in (
-            "Random Forest",
-            "XGBoost",
-            "Decision Tree"
-        ):
-
-            explainer = shap.TreeExplainer(
-                chosen_model
-            )
-
-            shap_values = explainer.shap_values(
-                X_test
-            )
-
-            # Binary classification with some tree models
-            # can return [class0, class1].
             if isinstance(shap_values, list):
-
+                # older SHAP behavior: list of per-class arrays
                 values = shap_values[1]
-
+            elif hasattr(shap_values, "ndim") and shap_values.ndim == 3:
+                # newer SHAP behavior: single 3D array (n_samples, n_features, n_classes)
+                # take the positive class (index 1) for binary classification
+                values = shap_values[:, :, 1]
             else:
-
                 values = shap_values
 
-        # -----------------------------------------------------------
-        # Logistic / Linear Regression
-        # -----------------------------------------------------------
-
         else:
+            explainer = shap.LinearExplainer(chosen_model, X_train)
+            values = explainer.shap_values(X_test)
+            if hasattr(values, "ndim") and values.ndim == 3:
+                values = values[:, :, 1]
 
-            explainer = shap.LinearExplainer(
-                chosen_model,
-                X_train
-            )
-
-            values = explainer.shap_values(
-                X_test
-            )
-
-        # -----------------------------------------------------------
-        # Calculate mean absolute SHAP values
-        # -----------------------------------------------------------
-
-        mean_abs_shap = np.abs(
-            values
-        ).mean(axis=0)
-
-        # -----------------------------------------------------------
-        # Rank features
-        # -----------------------------------------------------------
-
+        mean_abs_shap = np.abs(values).mean(axis=0)
         feature_importance = sorted(
-            zip(
-                X_test.columns,
-                mean_abs_shap
-            ),
-            key=lambda x: x[1],
-            reverse=True
+            zip(X_test.columns, mean_abs_shap), key=lambda x: x[1], reverse=True
         )
-
-        # -----------------------------------------------------------
-        # Get top five drivers
-        # -----------------------------------------------------------
+        feature_importance = [(name, float(val)) for name, val in feature_importance]  # ensure plain floats
 
         top_features = feature_importance[:5]
+        top_summary = ", ".join(f"{name} ({val:.3f})" for name, val in top_features)
 
-        top_summary = ", ".join(
-            f"{name} ({val:.3f})"
-            for name, val in top_features
-        )
+        explanations.append(make_explanation(
+            action=f"Computed SHAP feature importance for {chosen_name}",
+            reason="SHAP values quantify how much each feature pushed individual predictions toward or away from the predicted class, averaged across the test set.",
+            alternative_considered="Built-in model feature_importances_ (e.g. Random Forest's Gini importance)",
+            why_not_chosen="SHAP is more reliable for correlated features and gives consistent, per-prediction explanations, not just an overall ranking.",
+            expected_impact=f"Top drivers identified: {top_summary}.",
+            learning_note="SHAP values show both the magnitude and direction of each feature's effect on individual predictions, not just overall importance.",
+            confidence="High",
+        ))
 
-        # -----------------------------------------------------------
-        # SHAP explanation
-        # -----------------------------------------------------------
-
-        explanations.append(
-            make_explanation(
-                action=(
-                    f"Computed SHAP feature importance "
-                    f"for {chosen_name}"
-                ),
-
-                reason=(
-                    "SHAP values quantify how much each "
-                    "feature contributed to individual "
-                    "predictions, averaged across the "
-                    "test set."
-                ),
-
-                alternative_considered=(
-                    "Built-in model feature_importances_ "
-                    "(e.g. Random Forest's Gini importance)"
-                ),
-
-                why_not_chosen=(
-                    "SHAP provides consistent per-prediction "
-                    "explanations and shows the contribution "
-                    "of individual features rather than only "
-                    "providing an overall feature ranking."
-                ),
-
-                expected_impact=(
-                    f"Top drivers identified: "
-                    f"{top_summary}."
-                ),
-
-                learning_note=(
-                    "SHAP values show the magnitude and "
-                    "direction of each feature's effect "
-                    "on individual predictions, not just "
-                    "overall importance."
-                ),
-
-                confidence="High",
-            )
-        )
-
-        return (
-            feature_importance,
-            explanations
-        )
-
-    # ---------------------------------------------------------------
-    # SHAP failure handling
-    # ---------------------------------------------------------------
+        return feature_importance, explanations
 
     except Exception as e:
-
-        explanations.append(
-            make_explanation(
-                action="SHAP explanation skipped",
-
-                reason=(
-                    "SHAP computation failed for this "
-                    f"model type: {str(e)[:150]}"
-                ),
-
-                alternative_considered=(
-                    "Model-specific feature importance"
-                ),
-
-                why_not_chosen=(
-                    "Not automatically substituted — "
-                    "the limitation is explicitly flagged "
-                    "so it remains visible in the report."
-                ),
-
-                expected_impact=(
-                    "Feature-level driver explanations "
-                    "will not be available for this report."
-                ),
-
-                learning_note=(
-                    "Not all model/data combinations "
-                    "support SHAP out of the box."
-                ),
-
-                confidence="N/A",
-            )
-        )
-
-        return (
-            [],
-            explanations
-        )
+        explanations.append(make_explanation(
+            action="SHAP explanation skipped",
+            reason=f"SHAP computation failed for this model type: {str(e)[:150]}",
+            alternative_considered="Model-specific feature importance",
+            why_not_chosen="Not automatically substituted — flagged so the limitation is visible in the report.",
+            expected_impact="Feature-level driver explanations will not be available for this report.",
+            learning_note="Not all model/data combinations support SHAP out of the box.",
+            confidence="N/A",
+        ))
+        return [], explanations

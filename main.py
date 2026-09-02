@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -202,6 +203,15 @@ class ApprovalRequest(BaseModel):
     decision: str
     notes: str | None = None
 
+@app.get("/charts/{job_id}/{filename}")
+def get_chart(job_id: str, filename: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job or job.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied.")
+    chart_path = Path("data/plots") / filename
+    if not chart_path.exists():
+        raise HTTPException(status_code=404, detail="Chart not found.")
+    return FileResponse(chart_path)
 
 @app.post("/approve/{job_id}")
 def approve_report(
