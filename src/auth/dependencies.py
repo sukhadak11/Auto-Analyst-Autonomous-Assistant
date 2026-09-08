@@ -11,15 +11,15 @@ from models import User
 
 from security import decode_access_token
 
-security_scheme = HTTPBearer()
+security_scheme = HTTPBearer() # This tells FastAPI to expect an authorization header using the Bearer scheme. 
 
-
-def get_current_user(
+# Given a request containing a JWT, determine which user is making the request.
+def get_current_user(   
     credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
     db: Session = Depends(get_db),
 ) -> User:
     """Reads the JWT from the request's Authorization header, verifies it,
-    and returns the actual User object. Any endpoint that needs to know
+    and returns the actual User object. Any endpoint  that needs to know
     'who is calling this' depends on this function."""
     token = credentials.credentials
     user_id = decode_access_token(token)

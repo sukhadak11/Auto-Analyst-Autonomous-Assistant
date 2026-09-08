@@ -6,6 +6,8 @@ import threading
 import traceback
 import uuid
 import sys
+import joblib
+import pandas as pd
 from datetime import datetime
 from pathlib import Path
 
@@ -15,6 +17,9 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from typing import Dict, Any
+
+
 
 sys.path.append("src/agent")
 sys.path.append("src/auth")
@@ -28,19 +33,22 @@ from models import User, Job
 
 app = FastAPI(title="AutoAnalyst API")
 
+# CORS controls whether a frontend hosted on another origin can communicate with your API.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+#allow_origins=["*"] is very permissive. Whether that is appropriate depends on your deployment/security requirements.
+#For production, you would generally restrict origins to the actual frontend domains.
 
 app.include_router(auth_router)
 
 # make sure tables exist (safe to call every startup — does nothing if they already exist)
 Base.metadata.create_all(bind=engine)
 
-UPLOAD_DIR = Path(__file__).resolve().parent / "data" / "uploads"
+UPLOAD_DIR = Path(__file__).resolve().parent / "data" / "uploads" # If the directory doesn't exist, Python creates it.
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -59,23 +67,31 @@ def run_pipeline(job_id: str, saved_path: Path, question: str, target_column: st
         config = {"configurable": {"thread_id": job_id}}
 
         initial_state = {
-            "question": question,
-            "plan": [], "data_findings": "", "research_findings": "", "report": "",
-            "critique": "", "approved": False, "revision_count": 0,
-            "human_decision": "", "human_notes": "",
-            "explanations": [],
-            "raw_path": str(saved_path),
-            "clean_path": "",
-            "target_col": target_column or "",
-            "dataset_type": "",
-            "id_cols": [],
-            "needs_interpretability": True,
-            "model_path": "", "model_name": "",
-            "job_id": job_id,
-            "messages": [],
-        }
+    "question": question,
+    "plan": [],
+    "data_findings": "",
+    "research_findings": "",
+    "report": "",
+    "critique": "",
+    "approved": False,
+    "revision_count": 0,
+    "human_decision": "",
+    "human_notes": "",
+    "explanations": [],
+    "generated_charts": [],
 
-        final_state = app_graph.invoke(initial_state, config=config)
+    "raw_path": str(saved_path),
+    "clean_path": "",
+    "target_col": target_column or "",
+    "dataset_type": "",
+    "id_cols": [],
+    "needs_interpretability": True,
+    "model_path": "",
+    "model_name": "",
+    "job_id": job_id,
+    "messages": [],
+}
+        final_state = app_graph.invoke(initial_state, config=config) # Start the agent graph with the initial state and wait for the graph execution to finish.
 
         job.status = "awaiting_approval"
         job.report = final_state.get("report", "")
@@ -85,6 +101,7 @@ def run_pipeline(job_id: str, saved_path: Path, question: str, target_column: st
         job.dataset_type = final_state.get("dataset_type", "")
         job.model_name = final_state.get("model_name", "")
         job.explanations = final_state.get("explanations", [])
+        job.generated_charts = final_state.get("generated_charts", [])
         db.commit()
 
     except Exception as e:
@@ -112,13 +129,14 @@ async def upload_dataset(
     if not (filename.endswith(".csv") or filename.endswith(".xlsx")):
         raise HTTPException(status_code=400, detail="Only CSV and XLSX files are supported.")
 
-    job_id = str(uuid.uuid4())[:16]
+    job_id = str(uuid.uuid4())[:16] # This generates a unique-looking job identifier.
     suffix = ".xlsx" if filename.endswith(".xlsx") else ".csv"
     saved_path = UPLOAD_DIR / f"{job_id}{suffix}"
 
     with open(saved_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
+# XLSX gets converted to CSV, suffix is use for converting xlsx to csv, and saved_path is the path to the saved file. The code checks if the uploaded file is an XLSX file, and if so, it converts it to CSV format using pandas. The converted CSV file is then saved in the UPLOAD_DIR with the same job_id but with a .csv extension.
     if suffix == ".xlsx":
         csv_path = UPLOAD_DIR / f"{job_id}.csv"
         pd.read_excel(saved_path).to_csv(csv_path, index=False)
@@ -150,7 +168,7 @@ async def upload_dataset(
 @app.get("/status/{job_id}")
 def get_status(
     job_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user), # means the user must authenticate
     db: Session = Depends(get_db),
 ):
     """Returns a job's status — only if it belongs to the current user."""
@@ -178,6 +196,7 @@ def get_status(
             "dataset_type": job.dataset_type,
             "model_name": job.model_name,
             "explanations": job.explanations,
+            "generated_charts": job.generated_charts,
             "human_decision": job.human_decision,
             "human_notes": job.human_notes,
         }
@@ -185,6 +204,57 @@ def get_status(
     return response
 
 
+class PredictionRequest(BaseModel):
+    features: Dict[str, Any]  # e.g. {"international_plan": 1, "day_mins": 120, ...}
+
+
+@app.post("/predict/{job_id}")
+def predict_for_instance(
+    job_id: str,
+    body: PredictionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Scores one specific set of feature values against a job's trained model."""
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job or job.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied.")
+
+    if job.status not in ("awaiting_approval", "approved"):
+        raise HTTPException(status_code=400, detail="Model not yet trained for this job.")
+
+    model_path = f"data/model_{job_id}.joblib"
+    if not Path(model_path).exists():
+        raise HTTPException(status_code=404, detail="Trained model file not found.")
+
+    model = joblib.load(model_path)
+
+    # Build a single-row dataframe matching the model's expected columns
+    input_df = pd.DataFrame([body.features])
+
+    try:
+        expected_cols = model.feature_names_in_
+        missing = [c for c in expected_cols if c not in input_df.columns]
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing required feature(s): {missing}. Model expects: {list(expected_cols)}",
+            )
+        input_df = input_df[expected_cols]  # ensure correct column order
+
+        probability = model.predict_proba(input_df)[0][1]
+        prediction = int(model.predict(input_df)[0])
+
+        return {
+            "job_id": job_id,
+            "prediction": prediction,
+            "churn_probability": round(float(probability), 4),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
+    
 @app.get("/jobs")
 def list_my_jobs(
     current_user: User = Depends(get_current_user),
@@ -204,15 +274,43 @@ class ApprovalRequest(BaseModel):
     notes: str | None = None
 
 @app.get("/charts/{job_id}/{filename}")
-def get_chart(job_id: str, filename: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_chart(
+    job_id: str,
+    filename: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     job = db.query(Job).filter(Job.id == job_id).first()
-    if not job or job.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Access denied.")
-    chart_path = Path("data/plots") / filename
-    if not chart_path.exists():
-        raise HTTPException(status_code=404, detail="Chart not found.")
-    return FileResponse(chart_path)
 
+    if not job:
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found."
+        )
+
+    if job.user_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied."
+        )
+
+    chart_path = (
+        Path(__file__).resolve().parent
+        / "data"
+        / "plots"
+        / filename
+    )
+
+    if not chart_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Chart not found: {filename}"
+        )
+
+    return FileResponse(
+        chart_path,
+        media_type="image/png"
+    )
 @app.post("/approve/{job_id}")
 def approve_report(
     job_id: str,

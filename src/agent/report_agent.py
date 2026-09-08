@@ -23,14 +23,21 @@ llm = ChatGroq(
 
 REPORT_PROMPT = """You are the Report Agent. Answer the user's question directly
 and briefly using ONLY the findings below. Never invent numbers, methods, or
-claims not present in the findings. If information needed to answer is missing,
-say so in one sentence — do not speculate.
+claims not present in the findings.
+
+CRITICAL RULE: If the question asks about a SPECIFIC individual, customer, or
+record (e.g. gives specific feature values and asks "will THIS customer churn"),
+and no per-instance prediction result appears in the findings below, you MUST
+say exactly: "A specific prediction for this individual was not computed in
+this analysis; only the model's aggregate performance on the full dataset is
+available." Do NOT invent a risk score, probability, or individual assessment.
 
 User's question: {question}
 
 Data findings: {data_findings}
 Top feature drivers: {feature_importance_summary}
 Research findings: {research_findings}
+Per-instance prediction (if computed): {prediction_result}
 
 {revision_note}
 
@@ -41,7 +48,6 @@ Write ONLY these two sections, each 2-4 sentences maximum:
 Do not write more than 150 words total. Do not repeat the findings verbatim —
 synthesize them.
 """
-
 
 def report_agent_node(state: AgentState) -> AgentState:
     revision_note = ""
@@ -66,12 +72,15 @@ Do not ignore the feedback."""
         )
 
     research_findings = state.get("research_findings", "")
+    prediction_result = state.get("prediction_result", "Not computed in this analysis.")
+
 
     prompt = REPORT_PROMPT.format(
         question=state.get("question", "Analyze this dataset and summarize the key findings."),
         data_findings=state.get("data_findings", "None provided."),
         feature_importance_summary=feature_importance_summary,
         research_findings=research_findings or "None provided.",
+        prediction_result=prediction_result,
         revision_note=revision_note,
     )
 
