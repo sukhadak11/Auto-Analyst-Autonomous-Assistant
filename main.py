@@ -178,7 +178,7 @@ def get_status(
         raise HTTPException(status_code=404, detail="Job not found.")
 
     # ownership check — this is the actual security enforcement
-    if job.user_id != current_user.id:
+    if not current_user.is_admin and job.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not have access to this job.")
 
     response = {"job_id": job.id, "status": job.status}
@@ -256,18 +256,42 @@ def predict_for_instance(
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
     
 @app.get("/jobs")
-def list_my_jobs(
+def list_jobs(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Lists every job the current user has ever submitted —
-    this is the 'retrieve previous analyses' requirement."""
-    jobs = db.query(Job).filter(Job.user_id == current_user.id).order_by(Job.created_at.desc()).all()
+    """
+    Admin:
+        Can see all users' jobs.
+
+    Normal user:
+        Can see only their own jobs.
+    """
+
+    if current_user.is_admin:
+        jobs = (
+            db.query(Job)
+            .order_by(Job.created_at.desc())
+            .all()
+        )
+    else:
+        jobs = (
+            db.query(Job)
+            .filter(Job.user_id == current_user.id)
+            .order_by(Job.created_at.desc())
+            .all()
+        )
+
     return [
-        {"job_id": j.id, "question": j.question, "status": j.status, "created_at": j.created_at}
+        {
+            "job_id": j.id,
+            "user_id": j.user_id,
+            "question": j.question,
+            "status": j.status,
+            "created_at": j.created_at,
+        }
         for j in jobs
     ]
-
 
 class ApprovalRequest(BaseModel):
     decision: str
@@ -288,7 +312,9 @@ def get_chart(
             detail="Job not found."
         )
 
-    if job.user_id != current_user.id:
+    # Admin can access charts from any job.
+    # Normal users can access charts only from their own jobs.
+    if not current_user.is_admin and job.user_id != current_user.id:
         raise HTTPException(
             status_code=403,
             detail="Access denied."
@@ -324,7 +350,7 @@ def approve_report(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found.")
 
-    if job.user_id != current_user.id:
+    if not current_user.is_admin and job.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You do not have access to this job.")
 
     if job.status != "awaiting_approval":

@@ -15,6 +15,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False, nullable=False)
 
     jobs = relationship("Job", back_populates="owner") # This sets up a relationship between the User and Job models. It allows you to access all jobs associated with a user via user.jobs, and it also allows you to access the owner of a job via job.owner. This is a one-to-many relationship
 
