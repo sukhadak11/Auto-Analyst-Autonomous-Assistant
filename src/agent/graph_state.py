@@ -1,8 +1,6 @@
 # src/agent/graph_state.py
-
 from typing import TypedDict, List, Annotated
 import operator
-
 from explanation_schema import Explanation
 
 

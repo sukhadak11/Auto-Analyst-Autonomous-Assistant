@@ -4,6 +4,7 @@ logging in, and verifying a JWT token.'''
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
+from dependencies import get_current_user
 
 import sys
 from pathlib import Path
@@ -59,3 +60,12 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
 
     token = create_access_token(user.id)
     return TokenResponse(access_token=token)
+
+@router.get("/me")
+def get_me(current_user: User = Depends(get_current_user)):
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "is_admin": current_user.is_admin,
+        "is_active": current_user.is_active,
+    }
