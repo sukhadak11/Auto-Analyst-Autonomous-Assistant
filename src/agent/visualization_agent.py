@@ -3,11 +3,12 @@ from pathlib import Path
 import sys
 
 from graph_state import AgentState
-from explanation_schema import format_explanations, make_explanation
 
-# Allow importing visualization_logic.py from src/pipeline
 sys.path.append(
-    str(Path(__file__).resolve().parents[1] / "pipeline")
+    str(
+        Path(__file__).resolve().parents[1]
+        / "pipeline"
+    )
 )
 
 from visualization_logic import (
@@ -15,64 +16,65 @@ from visualization_logic import (
 )
 
 
-def visualization_agent_node(state: AgentState) -> AgentState:
+def visualization_agent_node(
+    state: AgentState,
+) -> AgentState:
     """
-    Visualization Agent
+    Generate visualizations from the cleaned dataset.
 
-    Responsibilities:
-    1. Load the cleaned dataset.
-    2. Understand the user's visualization request.
-    3. Select suitable visualizations.
-    4. Generate chart PNG files.
-    5. Store chart metadata in state["generated_charts"].
-    6. Store structured visualization explanations.
+    The Visualization Agent:
+    1. Loads the cleaned dataset.
+    2. Passes the real dataset to visualization logic.
+    3. Generates appropriate charts.
+    4. Stores JSON-safe chart metadata in generated_charts.
+    5. Stores explanations in the agent state.
     """
-
-    # --------------------------------------------------------
-    # Get required values from state
-    # --------------------------------------------------------
 
     clean_path = state.get(
         "clean_path",
-        "data/clean_data.csv"
+        "data/clean_data.csv",
     )
 
-    target_col = state.get("target_col")
+    target_col = state.get(
+        "target_col"
+    )
 
     job_id = state.get(
         "job_id",
-        "manual_test"
+        "manual_test",
     )
 
     question = state.get(
         "question",
-        ""
+        "",
+    )
+
+    clean_file = Path(
+        clean_path
     )
 
     # --------------------------------------------------------
     # Validate cleaned dataset
     # --------------------------------------------------------
 
-    clean_file = Path(clean_path)
-
     if not clean_file.exists():
+
+        message = (
+            "Visualization Agent could not find "
+            f"the cleaned dataset: {clean_file}"
+        )
 
         state["generated_charts"] = []
 
-        error_message = (
-            f"Visualization Agent could not find the "
-            f"cleaned dataset: {clean_file}"
+        state["messages"] = (
+            state.get("messages", [])
+            + [message]
         )
 
         state["data_findings"] = (
             state.get("data_findings", "")
             + "\n"
-            + error_message
-        )
-
-        state["messages"] = (
-            state.get("messages", [])
-            + [error_message]
+            + message
         )
 
         return state
@@ -82,26 +84,29 @@ def visualization_agent_node(state: AgentState) -> AgentState:
     # --------------------------------------------------------
 
     try:
-        df = pd.read_csv(clean_file)
 
-    except Exception as exc:
+        df = pd.read_csv(
+            clean_file
+        )
 
-        error_message = (
-            f"Visualization Agent failed to load "
-            f"the cleaned dataset: {exc}"
+    except Exception as e:
+
+        message = (
+            "Visualization Agent could not read "
+            f"the cleaned dataset: {e}"
         )
 
         state["generated_charts"] = []
 
+        state["messages"] = (
+            state.get("messages", [])
+            + [message]
+        )
+
         state["data_findings"] = (
             state.get("data_findings", "")
             + "\n"
-            + error_message
-        )
-
-        state["messages"] = (
-            state.get("messages", [])
-            + [error_message]
+            + message
         )
 
         return state
@@ -119,133 +124,253 @@ def visualization_agent_node(state: AgentState) -> AgentState:
                 question=question,
                 feature_importance=state.get(
                     "feature_importance",
-                    []
+                    [],
                 ),
                 job_id=job_id,
                 output_dir="data/plots",
             )
         )
 
-    except Exception as exc:
+    except Exception as e:
 
-        error_message = (
-            f"Visualization Agent failed while "
-            f"generating visualizations: {exc}"
+        message = (
+            "Visualization Agent encountered an error "
+            f"while generating charts: {e}"
         )
 
         state["generated_charts"] = []
 
+        state["messages"] = (
+            state.get("messages", [])
+            + [message]
+        )
+
         state["data_findings"] = (
             state.get("data_findings", "")
             + "\n"
-            + error_message
-        )
-
-        state["messages"] = (
-            state.get("messages", [])
-            + [error_message]
+            + message
         )
 
         return state
 
     # --------------------------------------------------------
-    # Validate chart metadata
+    # Normalize chart metadata
     # --------------------------------------------------------
 
-    if not isinstance(charts, list):
-        charts = []
-
-    valid_charts = []
+    normalized_charts = []
 
     for chart in charts:
 
+        # Expected format:
+        # {
+        #     "chart_type": "...",
+        #     "filename": "..."
+        # }
+
         if isinstance(chart, dict):
 
-            valid_charts.append(chart)
+            filename = (
+                chart.get("filename")
+                or chart.get("file")
+                or chart.get("name")
+            )
 
-        elif isinstance(chart, (tuple, list)) and len(chart) >= 2:
+            chart_type = (
+                chart.get("chart_type")
+                or "visualization"
+            )
 
-            # Backward compatibility with:
-            # ("chart_type", "filename")
+            if filename:
 
-            valid_charts.append(
+                normalized_charts.append(
+                    {
+                        "chart_type": str(
+                            chart_type
+                        ),
+                        "filename": str(
+                            filename
+                        ),
+                    }
+                )
+
+        # Backward compatibility:
+        # ("chart_type", "path")
+        elif isinstance(chart, (tuple, list)):
+
+            if len(chart) >= 2:
+
+                chart_type = chart[0]
+                chart_path = chart[1]
+
+                filename = Path(
+                    str(chart_path)
+                ).name
+
+                normalized_charts.append(
+                    {
+                        "chart_type": str(
+                            chart_type
+                        ),
+                        "filename": filename,
+                    }
+                )
+
+        # Backward compatibility:
+        # plain filename/path
+        elif chart:
+
+            filename = Path(
+                str(chart)
+            ).name
+
+            normalized_charts.append(
                 {
-                    "chart_type": chart[0],
-                    "filename": chart[1],
+                    "chart_type": "visualization",
+                    "filename": filename,
                 }
             )
 
-    charts = valid_charts
-
     # --------------------------------------------------------
-    # Store generated chart metadata
+    # Remove duplicate charts
     # --------------------------------------------------------
 
-    state["generated_charts"] = charts
+    unique_charts = []
+
+    seen = set()
+
+    for chart in normalized_charts:
+
+        filename = chart.get(
+            "filename"
+        )
+
+        if (
+            filename
+            and filename not in seen
+        ):
+
+            unique_charts.append(
+                chart
+            )
+
+            seen.add(
+                filename
+            )
+
+    normalized_charts = unique_charts
 
     # --------------------------------------------------------
-    # Normalize explanations
+    # Store charts
     # --------------------------------------------------------
+
+    state["generated_charts"] = (
+        normalized_charts
+    )
+
+    # --------------------------------------------------------
+    # Store explanations safely
+    # --------------------------------------------------------
+
+    existing_explanations = state.get(
+        "explanations",
+        [],
+    )
 
     normalized_explanations = []
 
-    if explanations:
+    for explanation in explanations:
 
-        for explanation in explanations:
+        if isinstance(
+            explanation,
+            dict,
+        ):
 
-            # Already a structured Explanation dictionary
-            if isinstance(explanation, dict):
+            normalized_explanations.append(
+                explanation
+            )
 
-                normalized_explanations.append(explanation)
+        else:
 
-            # If visualization_logic returns a string,
-            # convert it into the expected Explanation structure.
-            elif isinstance(explanation, str):
+            # Convert legacy string explanations
+            # into the Explanation schema.
 
-                normalized_explanations.append(
-                    make_explanation(
-                        action="Generate visualization",
-                        reason=explanation,
-                        alternative_considered="Other suitable chart types",
-                        why_not_chosen="The selected visualization was considered more appropriate for the user's question and available data.",
-                        expected_impact="Improve understanding of the relevant pattern or relationship in the dataset.",
-                        learning_note="Visualization selection is based on the question and characteristics of the uploaded dataset.",
-                        confidence="Medium",
-                    )
-                )
-
-    # --------------------------------------------------------
-    # Store explanations
-    # --------------------------------------------------------
+            normalized_explanations.append(
+                {
+                    "action": "Visualization decision",
+                    "reason": str(
+                        explanation
+                    ),
+                    "alternative_considered": (
+                        "No visualization"
+                    ),
+                    "why_not_chosen": (
+                        "A visualization was considered "
+                        "useful for the requested analysis."
+                    ),
+                    "expected_impact": (
+                        "Improve understanding of "
+                        "the analysis findings."
+                    ),
+                    "learning_note": (
+                        "Visualization selection is based "
+                        "on the question and available data."
+                    ),
+                    "confidence": "Medium",
+                }
+            )
 
     state["explanations"] = (
-        state.get("explanations", [])
+        existing_explanations
         + normalized_explanations
     )
 
     # --------------------------------------------------------
-    # Format explanations for findings
+    # Data findings
     # --------------------------------------------------------
 
-    formatted_explanations = format_explanations(
-        normalized_explanations
-    )
+    if normalized_charts:
+
+        chart_names = [
+            chart["filename"]
+            for chart in normalized_charts
+        ]
+
+        finding = (
+            "Visualization Agent generated "
+            f"{len(normalized_charts)} chart(s): "
+            + ", ".join(chart_names)
+        )
+
+    else:
+
+        finding = (
+            "Visualization Agent did not generate "
+            "any suitable charts."
+        )
 
     state["data_findings"] = (
-        state.get("data_findings", "")
+        state.get(
+            "data_findings",
+            "",
+        )
         + "\n"
-        + formatted_explanations
+        + finding
     )
 
     # --------------------------------------------------------
-    # Store agent message
+    # Messages
     # --------------------------------------------------------
 
     state["messages"] = (
-        state.get("messages", [])
+        state.get(
+            "messages",
+            [],
+        )
         + [
-            "Visualization Agent: "
-            f"generated {len(charts)} chart(s)."
+            (
+                "Visualization Agent: generated "
+                f"{len(normalized_charts)} chart(s)."
+            )
         ]
     )
 

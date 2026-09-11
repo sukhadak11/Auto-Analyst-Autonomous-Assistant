@@ -57,3 +57,5 @@ class Job(Base):
 
     owner = relationship("User", back_populates="jobs") # This sets up the reverse relationship from Job to User. It allows you to access the owner of a job via job.owner, and it also allows you to access all jobs associated with a user via user.jobs. This is a many-to-one relationship.
     # This is important because SQLAlchemy uses back_populates to connect the two relationship properties.
+
+    

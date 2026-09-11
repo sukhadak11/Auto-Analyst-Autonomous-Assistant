@@ -12,6 +12,10 @@ from graph_state import AgentState
 from llm_config import llm, safe_invoke
 
 
+# =========================================================
+# Available Agents
+# =========================================================
+
 AVAILABLE_AGENTS = {
     "profiling": (
         "Always required. Detects the target column, dataset type, "
@@ -65,6 +69,10 @@ AVAILABLE_AGENTS = {
 }
 
 
+# =========================================================
+# Planner Prompt
+# =========================================================
+
 PLANNER_PROMPT = """
 You are the planning agent for a generic automated data-analysis system.
 
@@ -83,6 +91,7 @@ HARD RULES
    - cleaning
    - report
 
+
 2. MODEL TRAINING:
 
    Include model_training when the question involves:
@@ -99,6 +108,7 @@ HARD RULES
    Do not require model_training for purely descriptive questions where
    prediction or outcome explanation is clearly unnecessary.
 
+
 3. STATISTICS:
 
    Include statistics when the question asks for or would materially
@@ -111,6 +121,7 @@ HARD RULES
    - patterns
    - relationships between variables
    - segment-level statistical analysis
+
 
 4. VISUALIZATION:
 
@@ -130,9 +141,19 @@ HARD RULES
 
    OR
 
-   - The user asks for trends, comparisons, distributions, relationships,
-     rankings, patterns, segment differences, or other findings where a
-     visual representation would materially improve understanding.
+   - The user asks for:
+       * trends
+       * comparisons
+       * distributions
+       * relationships
+       * rankings
+       * patterns
+       * segment differences
+       * proportions
+       * percentages
+       * breakdowns
+
+     where a visual representation would materially improve understanding.
 
    OR
 
@@ -140,6 +161,7 @@ HARD RULES
      important findings to be communicated visually.
 
    IMPORTANT:
+
    Visualization selection must NOT depend on specific dataset names,
    business domains, or hardcoded column names.
 
@@ -154,6 +176,7 @@ HARD RULES
    The planner should only decide whether visualization is needed.
    It should NOT decide the exact chart or column.
 
+
 5. TIME SERIES:
 
    Include time_series ONLY when dataset_type is exactly:
@@ -161,16 +184,19 @@ HARD RULES
 
    Never select time_series based only on the wording of the question.
 
+
 6. RESEARCH:
 
    Include research when external context, benchmarks, industry
    information, or supporting external evidence would improve the answer.
+
 
 ========================
 AVAILABLE AGENTS
 ========================
 
 {agent_descriptions}
+
 
 ========================
 INPUT
@@ -181,6 +207,7 @@ Business question:
 
 Dataset type:
 {dataset_type}
+
 
 ========================
 OUTPUT
@@ -194,13 +221,18 @@ Do not return additional text.
 """
 
 
+# =========================================================
+# Planner Node
+# =========================================================
+
 def plan_node(state: AgentState) -> AgentState:
     """
     Determine which agents are required for the current user question.
 
-    The planner is dataset-agnostic. It decides whether visualization is
-    required, while the Visualization Agent decides which columns and
-    chart types should actually be used.
+    The planner is dataset-agnostic.
+
+    The LLM determines the initial agent selection, while deterministic
+    rules guarantee mandatory agents and explicit visualization requests.
     """
 
     agent_descriptions = "\n".join(
@@ -211,34 +243,69 @@ def plan_node(state: AgentState) -> AgentState:
     prompt = PLANNER_PROMPT.format(
         agent_descriptions=agent_descriptions,
         question=state["question"],
-        dataset_type=state.get("dataset_type", "unknown"),
+        dataset_type=state.get(
+            "dataset_type",
+            "unknown",
+        ),
     )
 
-    response = safe_invoke(llm, prompt)
+    # -----------------------------------------------------
+    # Ask LLM planner
+    # -----------------------------------------------------
+
+    response = safe_invoke(
+        llm,
+        prompt,
+    )
+
+    # -----------------------------------------------------
+    # Parse planner response
+    # -----------------------------------------------------
 
     try:
+
         content = response.content.strip()
 
-        # Handle accidental markdown code fences from the LLM.
+        # Remove accidental markdown fences.
         if content.startswith("```"):
-            content = content.replace("```json", "")
-            content = content.replace("```", "")
+
+            content = content.replace(
+                "```json",
+                "",
+            )
+
+            content = content.replace(
+                "```",
+                "",
+            )
+
             content = content.strip()
 
-        required = json.loads(content)
+        required = json.loads(
+            content
+        )
 
-        # Ensure the result is actually a list.
-        if not isinstance(required, list):
-            raise ValueError("Planner response is not a list.")
+        if not isinstance(
+            required,
+            list,
+        ):
+            raise ValueError(
+                "Planner response is not a list."
+            )
 
-        # Keep only known agents.
+        # Keep only valid agent names.
         required = [
             agent
             for agent in required
             if agent in AVAILABLE_AGENTS
         ]
 
-    except (json.JSONDecodeError, ValueError, TypeError):
+    except (
+        json.JSONDecodeError,
+        ValueError,
+        TypeError,
+    ):
+
         # Safe fallback.
         required = [
             "profiling",
@@ -249,49 +316,191 @@ def plan_node(state: AgentState) -> AgentState:
             "report",
         ]
 
-    # -----------------------------------------
-    # Mandatory agents
-    # -----------------------------------------
+    # =====================================================
+    # Deterministic Visualization Rule
+    # =====================================================
+    #
+    # The LLM should decide whether visualization is useful,
+    # but an explicit visualization request must NEVER be
+    # accidentally skipped.
+    #
+    # This is dataset-agnostic. It does not inspect or assume
+    # any particular column name.
+    # =====================================================
+
+    question_lower = (
+        state["question"]
+        .lower()
+        .strip()
+    )
+
+    visualization_keywords = [
+        "visualization",
+        "visualizations",
+        "visualisation",
+        "visualisations",
+        "visualize",
+        "visualise",
+        "visual",
+        "visuals",
+        "visual analysis",
+
+        "chart",
+        "charts",
+
+        "plot",
+        "plots",
+
+        "graph",
+        "graphs",
+    ]
+
+    explicit_visualization_request = any(
+        keyword in question_lower
+        for keyword in visualization_keywords
+    )
+
+    if explicit_visualization_request:
+
+        if "visualization" not in required:
+
+            required.append(
+                "visualization"
+            )
+
+    # =====================================================
+    # Additional Visualization Intent Rules
+    # =====================================================
+    #
+    # These terms often imply that a chart would materially
+    # improve the answer even when the user does not explicitly
+    # use the word chart or visualization.
+    # =====================================================
+
+    visual_analysis_terms = [
+        "show the trend",
+        "show trends",
+        "trend over time",
+
+        "compare",
+        "comparison",
+        "compare across",
+
+        "distribution",
+        "distributions",
+
+        "relationship",
+        "relationships",
+
+        "correlation",
+        "correlations",
+
+        "pattern",
+        "patterns",
+
+        "ranking",
+        "rankings",
+
+        "breakdown",
+        "breakdowns",
+
+        "proportion",
+        "proportions",
+
+        "percentage",
+        "percentages",
+
+        "segment differences",
+        "differences across",
+    ]
+
+    implicit_visualization_request = any(
+        term in question_lower
+        for term in visual_analysis_terms
+    )
+
+    if implicit_visualization_request:
+
+        if "visualization" not in required:
+
+            required.append(
+                "visualization"
+            )
+
+    # =====================================================
+    # Mandatory Agents
+    # =====================================================
 
     for always_needed in [
         "profiling",
         "cleaning",
         "report",
     ]:
-        if always_needed not in required:
-            required.append(always_needed)
 
-    # -----------------------------------------
-    # Time-series safety rule
-    # -----------------------------------------
+        if always_needed not in required:
+
+            required.append(
+                always_needed
+            )
+
+    # =====================================================
+    # Time-Series Safety Rule
+    # =====================================================
 
     if (
-        state.get("dataset_type") != "time_series"
+        state.get("dataset_type")
+        != "time_series"
         and "time_series" in required
     ):
-        required.remove("time_series")
 
-    # -----------------------------------------
-    # Store planner decision
-    # -----------------------------------------
+        required.remove(
+            "time_series"
+        )
 
-    state["required_agents"] = required
+    # =====================================================
+    # Remove Duplicate Agents
+    # =====================================================
+
+    required = list(
+        dict.fromkeys(
+            required
+        )
+    )
+
+    # =====================================================
+    # Store Planner Decision
+    # =====================================================
+
+    state["required_agents"] = (
+        required
+    )
 
     state["plan"] = [
-        f"Selected agents: {', '.join(required)}"
+        (
+            "Selected agents: "
+            + ", ".join(required)
+        )
     ]
 
     state["messages"] = (
-        state.get("messages", [])
-        + [f"Planner selected agents: {required}"]
+        state.get(
+            "messages",
+            [],
+        )
+        + [
+            (
+                "Planner selected agents: "
+                f"{required}"
+            )
+        ]
     )
 
     return state
 
 
-# ---------------------------------------------------------
-# Manual planner tests
-# ---------------------------------------------------------
+# =========================================================
+# Manual Planner Tests
+# =========================================================
 
 if __name__ == "__main__":
 
@@ -300,7 +509,8 @@ if __name__ == "__main__":
         {
             "name": "Action / prediction",
             "question": (
-                "What action should we take when the model predicts an outcome?"
+                "What action should we take when the model "
+                "predicts an outcome?"
             ),
             "dataset_type": "tabular",
         },
@@ -308,7 +518,8 @@ if __name__ == "__main__":
         {
             "name": "Statistical relationships",
             "question": (
-                "What statistical relationships exist between the variables?"
+                "What statistical relationships exist "
+                "between the variables?"
             ),
             "dataset_type": "tabular",
         },
@@ -316,7 +527,8 @@ if __name__ == "__main__":
         {
             "name": "Explicit visualization",
             "question": (
-                "Show me suitable charts for the important findings."
+                "Show me suitable charts for the "
+                "important findings."
             ),
             "dataset_type": "tabular",
         },
@@ -324,8 +536,26 @@ if __name__ == "__main__":
         {
             "name": "Relevant visualizations",
             "question": (
-                "Generate relevant visualizations based on the dataset "
-                "and the important findings."
+                "Generate relevant visualizations based "
+                "on the dataset and the important findings."
+            ),
+            "dataset_type": "tabular",
+        },
+
+        {
+            "name": "Visualisation spelling",
+            "question": (
+                "Generate suitable visualisations "
+                "for this dataset."
+            ),
+            "dataset_type": "tabular",
+        },
+
+        {
+            "name": "Chart request",
+            "question": (
+                "Create charts showing the important "
+                "factors associated with the outcome."
             ),
             "dataset_type": "tabular",
         },
@@ -333,7 +563,8 @@ if __name__ == "__main__":
         {
             "name": "Trend",
             "question": (
-                "Show the trend over time and explain the important changes."
+                "Show the trend over time and explain "
+                "the important changes."
             ),
             "dataset_type": "time_series",
         },
@@ -341,9 +572,11 @@ if __name__ == "__main__":
         {
             "name": "Complete analysis",
             "question": (
-                "Perform a complete analysis of the uploaded dataset. "
-                "Identify important patterns, relationships, segment "
-                "differences, and generate suitable visualizations."
+                "Perform a complete analysis of the "
+                "uploaded dataset. Identify important "
+                "patterns, relationships, segment "
+                "differences, and generate suitable "
+                "visualizations."
             ),
             "dataset_type": "tabular",
         },
@@ -357,8 +590,20 @@ if __name__ == "__main__":
             "messages": [],
         }
 
-        result = plan_node(state)
+        result = plan_node(
+            state
+        )
 
-        print(f"\n{test['name']}")
-        print("-" * 60)
-        print(result["required_agents"])
+        print(
+            f"\n{test['name']}"
+        )
+
+        print(
+            "-" * 60
+        )
+
+        print(
+            result[
+                "required_agents"
+            ]
+        )

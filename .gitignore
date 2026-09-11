@@ -31,3 +31,17 @@ __pycache__/
 chroma/
 memory/
 
+# Database
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# Python
+__pycache__/
+*.pyc
+
+# Environment
+.env
+.venv/
+venv/
+

@@ -111,3 +111,9 @@ webencodings==0.5.1
 websocket-client==1.9.0
 widgetsnbextension==4.0.15
 xgboost==3.2.0
+
+streamlit
+requests
+pandas
+plotly
+openpyxl

@@ -1,26 +1,35 @@
-'''Routes for user authentication. This includes registering a new user,
-logging in, and verifying a JWT token.'''
+"""Routes for user authentication."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
-from dependencies import get_current_user
 
 import sys
 from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parents[1] / "db"))
+
+sys.path.append(
+    str(Path(__file__).resolve().parents[1] / "db")
+)
+
 from database import get_db
 from models import User
+from security import (
+    hash_password,
+    verify_password,
+    create_access_token,
+)
 
-from security import hash_password, verify_password, create_access_token
 
-router = APIRouter(prefix="/auth", tags=["auth"]) # This means all routes in this router start with: /auth
+router = APIRouter(
+    prefix="/auth",
+    tags=["auth"]
+)# This means all routes in this router start with: /auth
 
 
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str | bytes
-# Pydantic validates the request.
+
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -30,42 +39,82 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    user_id: str
+    email: str
+    is_admin: bool
+    is_active: bool
 
 
-@router.post("/register", response_model=TokenResponse)
-def register(body: RegisterRequest, db: Session = Depends(get_db)):
-    """Creates a new user account. Returns a token immediately so the
-    user is logged in right after registering."""
-    existing = db.query(User).filter(User.email == body.email).first() # Check if email already exists in DB to avoid duplicates (should be unique). 
+@router.post(
+    "/register",
+    response_model=TokenResponse
+)
+def register(
+    body: RegisterRequest,
+    db: Session = Depends(get_db)
+):
+    existing = (
+        db.query(User)
+        .filter(User.email == body.email)
+        .first()
+    )
+
     if existing:
-        raise HTTPException(status_code=400, detail="Email already registered.")
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered."
+        )
 
-    user = User(email=body.email, hashed_password=hash_password(body.password)) # 
+    user = User(
+        email=body.email,
+        hashed_password=hash_password(body.password)
+    )
+
     db.add(user) # Adds the new user object to the current SQLAlchemy session.
     db.commit() # Commits the transaction to the database.
     db.refresh(user) # Refreshes the Python object using the database state.
 
     token = create_access_token(user.id)
-    return TokenResponse(access_token=token)
-# JWT : is based on header, playload and signature
 
-@router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest, db: Session = Depends(get_db)):
-    """Logs an existing user in. Returns a token to use for all
-    subsequent authenticated requests."""
-    user = db.query(User).filter(User.email == body.email).first()
+    return TokenResponse(
+        access_token=token,
+        user_id=user.id,
+        email=user.email,
+        is_admin=user.is_admin,
+        is_active=user.is_active,
+    )
 
-    if not user or not verify_password(body.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Incorrect email or password.")
+
+@router.post(
+    "/login",
+    response_model=TokenResponse
+)
+def login(
+    body: LoginRequest,
+    db: Session = Depends(get_db)
+):
+    user = (
+        db.query(User)
+        .filter(User.email == body.email)
+        .first()
+    )# Check if email already exists in DB to avoid duplicates (should be unique).
+
+    if not user or not verify_password(
+        body.password,
+        user.hashed_password
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect email or password."
+        )
 
     token = create_access_token(user.id)
-    return TokenResponse(access_token=token)
 
-@router.get("/me")
-def get_me(current_user: User = Depends(get_current_user)):
-    return {
-        "id": current_user.id,
-        "email": current_user.email,
-        "is_admin": current_user.is_admin,
-        "is_active": current_user.is_active,
-    }
+    return TokenResponse(
+        access_token=token,
+        user_id=user.id,
+        email=user.email,
+        is_admin=user.is_admin,
+        is_active=user.is_active,
+    )
+# JWT : is based on header, playload and signature
