@@ -1935,6 +1935,162 @@ def approve_job(
         ),
     }
 
+# ============================================================
+# DELETE JOB
+# ============================================================
+
+@app.delete("/jobs/{job_id}")
+def delete_job(
+    job_id: str,
+
+    current_user: User = Depends(
+        get_current_user
+    ),
+
+    db: Session = Depends(
+        get_db
+    ),
+):
+    """
+    Delete an analysis job.
+
+    Admin:
+        Can delete any user's job.
+
+    Normal user:
+        Can delete only their own job.
+
+    Also removes:
+        - Uploaded dataset
+        - Generated chart files
+        - Trained model file
+        - Database job record
+    """
+
+    # --------------------------------------------------------
+    # Find job
+    # --------------------------------------------------------
+
+    job = (
+        db.query(Job)
+        .filter(
+            Job.id == job_id
+        )
+        .first()
+    )
+
+    if not job:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found.",
+        )
+
+    # --------------------------------------------------------
+    # Access control
+    # --------------------------------------------------------
+
+    if (
+        not current_user.is_admin
+        and job.user_id != current_user.id
+    ):
+
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "You do not have "
+                "permission to delete this job."
+            ),
+        )
+
+    # --------------------------------------------------------
+    # Delete uploaded dataset
+    # --------------------------------------------------------
+
+    if job.raw_path:
+
+        raw_path = Path(
+            job.raw_path
+        )
+
+        if raw_path.exists():
+
+            try:
+                raw_path.unlink()
+
+            except OSError:
+                pass
+
+    # --------------------------------------------------------
+    # Delete generated charts
+    # --------------------------------------------------------
+
+    generated_charts = (
+        job.generated_charts or []
+    )
+
+    for chart in generated_charts:
+
+        if not isinstance(
+            chart,
+            dict,
+        ):
+            continue
+
+        filename = chart.get(
+            "filename"
+        )
+
+        if not filename:
+            continue
+
+        safe_filename = Path(
+            str(filename)
+        ).name
+
+        chart_path = (
+            PLOTS_DIR
+            / safe_filename
+        )
+
+        if chart_path.exists():
+
+            try:
+                chart_path.unlink()
+
+            except OSError:
+                pass
+
+    # --------------------------------------------------------
+    # Delete trained model
+    # --------------------------------------------------------
+
+    model_path = (
+        BASE_DIR
+        / "data"
+        / f"model_{job_id}.joblib"
+    )
+
+    if model_path.exists():
+
+        try:
+            model_path.unlink()
+
+        except OSError:
+            pass
+
+    # --------------------------------------------------------
+    # Delete database record
+    # --------------------------------------------------------
+
+    db.delete(job)
+
+    db.commit()
+
+    return {
+        "job_id": job_id,
+        "message": "Job deleted successfully.",
+    }
 
 # ============================================================
 # REPROCESS JOB

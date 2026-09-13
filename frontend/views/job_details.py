@@ -6,6 +6,7 @@ from services.job_service import (
     get_job_status,
     approve_job,
     reprocess_job,
+    delete_job,
 )
 
 API_BASE_URL = "http://127.0.0.1:8001"
@@ -50,6 +51,17 @@ def _reprocess_job(
 ):
     """Reprocess an existing job in needs_revision state."""
     return reprocess_job(
+        job_id,
+        access_token,
+    )
+
+
+def _delete_job(
+    job_id: str,
+    access_token: str,
+):
+    """Delete an existing job."""
+    return delete_job(
         job_id,
         access_token,
     )
@@ -433,7 +445,7 @@ def _display_explanations(job_data):
 
                 if reason:
 
-                    st.markdown("**Reason**")
+                    st.markdown("Reason")
                     st.write(reason)
 
                 if alternative:
@@ -669,7 +681,7 @@ def _display_human_approval(
         with col3:
 
             if st.button(
-                "❌ Reject",
+                "Reject",
                 use_container_width=True,
                 key=f"reject_{job_id}",
             ):
@@ -842,6 +854,115 @@ def _display_human_approval(
 
 
 # =========================================================
+# Delete Job
+# =========================================================
+
+def _display_delete_job(
+    job_id: str,
+    access_token: str,
+):
+    """Display job deletion controls."""
+
+    st.divider()
+
+    st.subheader("Delete Job")
+
+    confirmation_key = (
+        f"confirm_delete_details_{job_id}"
+    )
+
+    is_confirming = st.session_state.get(
+        confirmation_key,
+        False,
+    )
+
+    if not is_confirming:
+
+        st.warning(
+            "Deleting this job will permanently remove "
+            "the job record, uploaded dataset, generated "
+            "charts, and trained model."
+        )
+
+        if st.button(
+            "Delete Job",
+            use_container_width=True,
+            key=f"delete_details_{job_id}",
+        ):
+
+            st.session_state[
+                confirmation_key
+            ] = True
+
+            st.rerun()
+
+        return
+
+    st.error(
+        "Are you sure you want to permanently delete "
+        "this job?"
+    )
+
+    confirm_col1, confirm_col2 = st.columns(2)
+
+    with confirm_col1:
+
+        if st.button(
+            "Confirm Delete",
+            type="primary",
+            use_container_width=True,
+            key=f"confirm_details_delete_{job_id}",
+        ):
+
+            try:
+
+                _delete_job(
+                    job_id,
+                    access_token,
+                )
+
+                st.session_state[
+                    confirmation_key
+                ] = False
+
+                st.session_state[
+                    "selected_job"
+                ] = None
+
+                st.session_state[
+                    "page"
+                ] = "My Jobs"
+
+                st.success(
+                    "Job deleted successfully."
+                )
+
+                time.sleep(0.5)
+
+                st.rerun()
+
+            except Exception as e:
+
+                st.error(
+                    f"Failed to delete job: {e}"
+                )
+
+    with confirm_col2:
+
+        if st.button(
+            "Cancel",
+            use_container_width=True,
+            key=f"cancel_details_delete_{job_id}",
+        ):
+
+            st.session_state[
+                confirmation_key
+            ] = False
+
+            st.rerun()
+
+
+# =========================================================
 # Main Job Details Page
 # =========================================================
 
@@ -872,7 +993,7 @@ def show_job_details(
     # Page Header
     # =====================================================
 
-    st.title(" Job Details")
+    st.title("Job Details")
 
     if not job_id:
 
@@ -887,11 +1008,12 @@ def show_job_details(
     # =====================================================
 
     if st.button(
-        "← Back to Jobs",
+        "Back to Jobs",
         key=f"back_jobs_{job_id}",
     ):
 
-        st.session_state["page"] = "jobs"
+        st.session_state["page"] = "My Jobs"
+        st.session_state["selected_job"] = None
         st.rerun()
 
     st.divider()
@@ -915,7 +1037,6 @@ def show_job_details(
 
         return
 
-    
     # =====================================================
     # Validate Response
     # =====================================================
@@ -1092,6 +1213,15 @@ def show_job_details(
     )
 
     # =====================================================
+    # Delete Job
+    # =====================================================
+
+    _display_delete_job(
+        job_id,
+        access_token,
+    )
+
+    # =====================================================
     # Auto Refresh
     # =====================================================
 
@@ -1108,4 +1238,4 @@ def show_job_details(
         )
 
         time.sleep(3)
-        st.rerun()
+        st.rerun()     

@@ -2,7 +2,7 @@ import streamlit as st
 
 
 def show_sidebar():
-    """Display sidebar navigation with Logout at the bottom."""
+    """Display sidebar navigation with Logout in a natural position."""
 
     st.sidebar.title("Auto Analyst")
 
@@ -20,10 +20,6 @@ def show_sidebar():
     if st.session_state.get("selected_job"):
         views.append("Job Details")
 
-    # --------------------------------------------------------
-    # Navigation
-    # --------------------------------------------------------
-
     for view in views:
         if st.sidebar.button(
             view,
@@ -33,16 +29,7 @@ def show_sidebar():
             st.session_state["page"] = view
             st.rerun()
 
-    # --------------------------------------------------------
-    # Push Logout toward the bottom
-    # --------------------------------------------------------
-
-    st.sidebar.markdown(
-        """
-        <div style="height: 40vh;"></div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.sidebar.write("")
 
     st.sidebar.divider()
 
