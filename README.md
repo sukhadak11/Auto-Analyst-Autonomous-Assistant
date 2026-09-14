@@ -460,7 +460,7 @@ The workflow adapts based on the dataset and business question.
 ## 1. Clone the Repository
 
 ``` bash
-git clone <your-repository-url>
+git clone <https://github.com/sukhadak11/Auto-Analyst-Autonomous-Assistant.git>
 cd Auto-Analyst-Autonomous-Assistant
 ```
 
@@ -647,7 +647,6 @@ MIT License
 
 ## 👤 Author
 
-**Your Name**
+**Sukhada Khade**
 
--   GitHub: `<your-github-profile>`
--   LinkedIn: `<your-linkedin-profile>`
+-   GitHub: `https://github.com/sukhadak11`
