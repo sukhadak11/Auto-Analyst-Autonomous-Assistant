@@ -11,7 +11,7 @@ from model_training_agent import model_training_agent_node
 from statistics_agent import statistics_agent_node
 from visualization_agent import visualization_agent_node
 from research_agent import research_agent_node
-from report_agent import report_agent_node
+from .adalflow.adalflow_report_node import adalflow_report_agent_node
 from critic_agent import critic_node
 
 MAX_REVISIONS = 3
@@ -63,7 +63,7 @@ def build_graph_for_api():
     graph.add_node("statistics_agent", statistics_agent_node)
     graph.add_node("visualization_agent", visualization_agent_node)
     graph.add_node("research_agent", research_agent_node)
-    graph.add_node("report_agent", report_agent_node)
+    graph.add_node("report_agent", adalflow_report_agent_node)
     graph.add_node("critic", critic_node)
 
     graph.set_entry_point("planner")

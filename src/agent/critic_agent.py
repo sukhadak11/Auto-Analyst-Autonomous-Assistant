@@ -40,15 +40,25 @@ ISSUES: (only genuine fabrications or contradictions)
 """
 
 def critic_node(state: AgentState) -> AgentState:
+
+    print("\n" + "=" * 60)
+    print("CRITIC AGENT CALLED")
+    print("=" * 60)
+
     prompt = CRITIC_PROMPT.format(
         data_findings=state.get("data_findings", "None provided."),
         research_findings=state.get("research_findings", "None provided."),
         report=state.get("report", ""),
     )
-    response = safe_invoke(critic_llm, prompt)   # <-- use critic_llm, not the shared 8B llm
+
+    response = safe_invoke(critic_llm, prompt)
     content = response.content.strip()
 
+    print("\nCritic Response:")
+    print(content)
+
     content_upper = content.upper()
+
     if "NEEDS_REVISION" in content_upper:
         approved = False
     elif "VERDICT: APPROVED" in content_upper:
@@ -58,5 +68,16 @@ def critic_node(state: AgentState) -> AgentState:
 
     state["critique"] = content
     state["approved"] = approved
-    state["messages"] = state.get("messages", []) + [f"Critic Agent verdict:\n{content}"]
+
+    print("\nCritic Approved:", approved)
+    print("Revision Count:", state.get("revision_count", 0))
+
+    state["messages"] = state.get("messages", []) + [
+        f"Critic Agent verdict:\n{content}"
+    ]
+
+    print("=" * 60)
+    print(" CRITIC AGENT COMPLETED")
+    print("=" * 60)
+
     return state

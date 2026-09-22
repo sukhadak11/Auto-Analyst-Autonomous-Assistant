@@ -44,7 +44,7 @@ sys.path.append("src/db")
 # PROJECT IMPORTS
 # ============================================================
 
-from graph import build_graph_for_api
+from src.agent.graph import build_graph_for_api
 
 from routes import router as auth_router
 
