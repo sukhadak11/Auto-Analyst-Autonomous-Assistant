@@ -92,6 +92,31 @@ def _download_chart(
     return None
 
 
+def _download_job_file(
+    job_id: str,
+    file_type: str,
+    access_token: str,
+):
+    """Download a job output file from the authenticated backend."""
+
+    try:
+        response = requests.get(
+            f"{API_BASE_URL}/download/{job_id}/{file_type}",
+            headers={
+                "Authorization": f"Bearer {access_token}"
+            },
+            timeout=30,
+        )
+
+        if response.status_code == 200:
+            return response.content
+
+    except requests.RequestException:
+        pass
+
+    return None
+
+
 # =========================================================
 # Response Helpers
 # =========================================================
@@ -258,6 +283,117 @@ def _display_dataset_information(job_data):
 
         st.markdown("**Model**")
         st.write(model_name)
+
+    # -----------------------------------------------------
+    # Dataset Preview
+    # -----------------------------------------------------
+
+    dataset = _get_field(
+        job_data,
+        ["dataset"],
+        {},
+    )
+
+    if isinstance(dataset, dict) and dataset:
+
+        st.markdown("### Dataset Preview")
+
+        preview_col1, preview_col2, preview_col3 = st.columns(3)
+
+        with preview_col1:
+            st.markdown("**Filename**")
+            st.write(
+                dataset.get(
+                    "filename",
+                    "Not available",
+                )
+            )
+
+        with preview_col2:
+            st.markdown("**Rows**")
+            st.write(
+                dataset.get(
+                    "rows",
+                    "Not available",
+                )
+            )
+
+        with preview_col3:
+            st.markdown("**Columns**")
+            st.write(
+                dataset.get(
+                    "columns",
+                    "Not available",
+                )
+            )
+
+        preview = dataset.get(
+            "preview",
+            [],
+        )
+
+        if preview:
+            st.dataframe(
+                preview,
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info(
+                "Dataset preview is not available."
+            )
+
+    # -----------------------------------------------------
+    # Downloads
+    # -----------------------------------------------------
+
+    st.markdown("### Downloads")
+
+    download_col1, download_col2 = st.columns(2)
+
+    with download_col1:
+
+        csv_data = _download_job_file(
+            job_id=st.session_state.get("selected_job", ""),
+            file_type="csv",
+            access_token=st.session_state.get("access_token"),
+        )
+
+        if csv_data:
+            st.download_button(
+                label="Download Processed CSV",
+                data=csv_data,
+                file_name="cleaned_data.csv",
+                mime="text/csv",
+                key=f"job_details_csv_{st.session_state.get('selected_job', 'unknown')}",
+                use_container_width=True,
+            )
+        else:
+            st.info(
+                "Processed CSV is not available."
+            )
+
+    with download_col2:
+
+        model_data = _download_job_file(
+            job_id=st.session_state.get("selected_job", ""),
+            file_type="model",
+            access_token=st.session_state.get("access_token"),
+        )
+
+        if model_data:
+            st.download_button(
+                label="Download Trained Model",
+                data=model_data,
+                file_name="trained_model.joblib",
+                mime="application/octet-stream",
+                key=f"job_details_model_{st.session_state.get('selected_job', 'unknown')}",
+                use_container_width=True,
+            )
+        else:
+            st.info(
+                "Trained model is not available."
+            )
 
 
 # =========================================================

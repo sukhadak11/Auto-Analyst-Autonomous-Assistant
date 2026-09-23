@@ -1,7 +1,8 @@
 import streamlit as st
+import requests
 
 from components.header import show_header
-from services.job_service import fetch_reports
+from services.job_service import fetch_reports, get_job_status, get_headers, API_BASE_URL
 
 
 def show_reports():
@@ -168,6 +169,136 @@ def show_reports():
                 )
 
             st.write("")
+
+            # ------------------------------------------------
+            # Dataset Preview
+            # ------------------------------------------------
+
+            if job_id:
+
+                try:
+                    job_status = get_job_status(
+                        job_id,
+                        access_token
+                    )
+
+                    dataset = job_status.get(
+                        "dataset",
+                        {}
+                    )
+
+                    if dataset:
+
+                        st.markdown(
+                            "### Dataset"
+                        )
+
+                        dataset_col1, dataset_col2, dataset_col3 = st.columns(3)
+
+                        with dataset_col1:
+                            st.write(
+                                f"**Filename:** "
+                                f"{dataset.get('filename', 'Not available')}"
+                            )
+
+                        with dataset_col2:
+                            st.write(
+                                f"**Rows:** "
+                                f"{dataset.get('rows', 'Not available')}"
+                            )
+
+                        with dataset_col3:
+                            st.write(
+                                f"**Columns:** "
+                                f"{dataset.get('columns', 'Not available')}"
+                            )
+
+                        preview = dataset.get(
+                            "preview",
+                            []
+                        )
+
+                        if preview:
+                            st.dataframe(
+                                preview,
+                                use_container_width=True,
+                                hide_index=True
+                            )
+                        else:
+                            st.info(
+                                "Dataset preview is not available."
+                            )
+
+                except Exception as e:
+                    st.warning(
+                        f"Unable to load dataset preview: {e}"
+                    )
+
+                # ------------------------------------------------
+                # Downloads
+                # ------------------------------------------------
+
+                st.markdown(
+                    "### Downloads"
+                )
+
+                download_col1, download_col2 = st.columns(2)
+
+                with download_col1:
+
+                    try:
+                        csv_response = requests.get(
+                            f"{API_BASE_URL}/download/{job_id}/csv",
+                            headers=get_headers(access_token),
+                            timeout=30
+                        )
+
+                        if csv_response.status_code == 200:
+                            st.download_button(
+                                label="Download Processed CSV",
+                                data=csv_response.content,
+                                file_name="cleaned_data.csv",
+                                mime="text/csv",
+                                key=f"download_csv_{job_id}_{index}",
+                                use_container_width=True
+                            )
+                        else:
+                            st.warning(
+                                "Processed CSV is not available."
+                            )
+
+                    except requests.RequestException:
+                        st.warning(
+                            "Unable to download the processed CSV."
+                        )
+
+                with download_col2:
+
+                    try:
+                        model_response = requests.get(
+                            f"{API_BASE_URL}/download/{job_id}/model",
+                            headers=get_headers(access_token),
+                            timeout=30
+                        )
+
+                        if model_response.status_code == 200:
+                            st.download_button(
+                                label="Download Trained Model",
+                                data=model_response.content,
+                                file_name="trained_model.joblib",
+                                mime="application/octet-stream",
+                                key=f"download_model_{job_id}_{index}",
+                                use_container_width=True
+                            )
+                        else:
+                            st.warning(
+                                "Trained model is not available."
+                            )
+
+                    except requests.RequestException:
+                        st.warning(
+                            "Unable to download the trained model."
+                        )
 
             # ------------------------------------------------
             # Open Job Details

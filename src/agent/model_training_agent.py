@@ -178,8 +178,37 @@ def model_training_agent_node(state: AgentState) -> AgentState:
     # Save trained model
     # ---------------------------------------------------------------
 
+    # ---------------------------------------------------------------
+    # Save trained model
+    # ---------------------------------------------------------------
+    # Store each job's trained model in its own output directory:
+    #
+    # data/output/<job_id>/model/trained_model.joblib
+    #
+    # Using job_id from AgentState keeps the model associated with
+    # the current analysis job.
+    # ---------------------------------------------------------------
+
+    project_root = Path(
+        __file__
+    ).resolve().parents[2]
+
+    model_dir = (
+        project_root
+        / "data"
+        / "output"
+        / str(job_id)
+        / "model"
+    )
+
+    model_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
     model_path = (
-        f"data/model_{job_id}.joblib"
+        model_dir
+        / "trained_model.joblib"
     )
 
     joblib.dump(

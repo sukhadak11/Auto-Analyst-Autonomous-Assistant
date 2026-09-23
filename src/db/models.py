@@ -1,6 +1,6 @@
 # src/db/models.py
 # Defines the user and job database models. These are the tables that will be created in the database, and they define the structure of the data that will be stored.
-from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, Text, JSON
+from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, Text, JSON, LargeBinary, Integer
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 import uuid

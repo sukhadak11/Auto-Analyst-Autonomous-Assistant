@@ -109,10 +109,10 @@ BASE_DIR = Path(
     __file__
 ).resolve().parent
 
-UPLOAD_DIR = (
+OUTPUT_DIR = (
     BASE_DIR
     / "data"
-    / "uploads"
+    / "output"
 )
 
 PLOTS_DIR = (
@@ -121,7 +121,15 @@ PLOTS_DIR = (
     / "plots"
 )
 
-UPLOAD_DIR.mkdir(
+# Legacy upload directory is kept for backward compatibility with
+# existing jobs created before the job-output structure was introduced.
+UPLOAD_DIR = (
+    BASE_DIR
+    / "data"
+    / "uploads"
+)
+
+OUTPUT_DIR.mkdir(
     parents=True,
     exist_ok=True,
 )
@@ -130,6 +138,100 @@ PLOTS_DIR.mkdir(
     parents=True,
     exist_ok=True,
 )
+
+UPLOAD_DIR.mkdir(
+    parents=True,
+    exist_ok=True,
+)
+
+
+def get_job_output_dir(job_id: str) -> Path:
+    """Return the root output directory for a job."""
+    return OUTPUT_DIR / job_id
+
+
+def get_job_csv_dir(job_id: str) -> Path:
+    """Return the CSV output directory for a job."""
+    return get_job_output_dir(job_id) / "csv"
+
+
+def get_job_model_dir(job_id: str) -> Path:
+    """Return the trained-model output directory for a job."""
+    return get_job_output_dir(job_id) / "model"
+
+
+def get_job_csv_path(job_id: str) -> Path:
+    """Return the uploaded/original CSV path for a job."""
+    return get_job_csv_dir(job_id) / "original_dataset.csv"
+
+
+def get_job_model_path(job_id: str) -> Path:
+    """Return the trained model path for a job."""
+    return get_job_model_dir(job_id) / "trained_model.joblib"
+
+
+def ensure_job_output_dirs(job_id: str) -> None:
+    """Create the CSV and model directories for a job."""
+    get_job_csv_dir(job_id).mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    get_job_model_dir(job_id).mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+
+def get_dataset_preview(
+    dataset_path: Path,
+    preview_rows: int = 10,
+) -> dict:
+    """
+    Build a lightweight dataset preview for the frontend.
+
+    The preview is generated from the CSV stored for the job and is
+    returned only as metadata/records; the complete dataset is not
+    loaded into the API response.
+    """
+    if not dataset_path.exists():
+        return {
+            "filename": dataset_path.name,
+            "rows": 0,
+            "columns": 0,
+            "column_names": [],
+            "preview": [],
+        }
+
+    try:
+        df = pd.read_csv(dataset_path)
+
+        return {
+            "filename": dataset_path.name,
+            "rows": int(len(df)),
+            "columns": int(len(df.columns)),
+            "column_names": [
+                str(column)
+                for column in df.columns
+            ],
+            "preview": (
+                df.head(preview_rows)
+                .fillna("")
+                .astype(object)
+                .to_dict(orient="records")
+            ),
+        }
+
+    except Exception as e:
+        return {
+            "filename": dataset_path.name,
+            "rows": 0,
+            "columns": 0,
+            "column_names": [],
+            "preview": [],
+            "error": (
+                f"Unable to generate dataset preview: {str(e)}"
+            ),
+        }
 
 
 # ============================================================
@@ -628,50 +730,41 @@ async def upload_dataset(
         uuid.uuid4()
     )[:16]
 
-    suffix = (
-        ".xlsx"
-        if filename.endswith(".xlsx")
-        else ".csv"
-    )
-
-    saved_path = (
-        UPLOAD_DIR
-        / f"{job_id}{suffix}"
-    )
-
     # --------------------------------------------------------
-    # Save uploaded file
+    # Create job-specific output directories
     # --------------------------------------------------------
 
-    with open(
-        saved_path,
-        "wb",
-    ) as f:
+    ensure_job_output_dirs(job_id)
 
-        shutil.copyfileobj(
-            file.file,
-            f,
-        )
+    saved_path = get_job_csv_path(job_id)
 
     # --------------------------------------------------------
-    # Convert XLSX to CSV
+    # Save uploaded dataset as CSV
     # --------------------------------------------------------
 
-    if suffix == ".xlsx":
+    if filename.endswith(".xlsx"):
 
-        csv_path = (
-            UPLOAD_DIR
-            / f"{job_id}.csv"
-        )
-
+        # XLSX uploads are converted directly into the job's
+        # CSV output directory. We do not keep a separate XLSX
+        # copy because the job output is standardized around CSV.
         pd.read_excel(
-            saved_path
+            file.file
         ).to_csv(
-            csv_path,
+            saved_path,
             index=False,
         )
 
-        saved_path = csv_path
+    else:
+
+        with open(
+            saved_path,
+            "wb",
+        ) as f:
+
+            shutil.copyfileobj(
+                file.file,
+                f,
+            )
 
     # --------------------------------------------------------
     # Create database job
@@ -722,6 +815,10 @@ async def upload_dataset(
     return {
         "job_id": job_id,
         "status": "queued",
+        "output_directory": str(
+            get_job_output_dir(job_id)
+            .relative_to(BASE_DIR)
+        ),
     }
 
 
@@ -857,6 +954,15 @@ def get_status(
             "human_notes": (
                 job.human_notes
             ),
+
+            # Question and dataset preview are returned after
+            # report generation so the frontend can show the
+            # analysis context alongside the report.
+            "question": job.question,
+
+            "dataset": get_dataset_preview(
+                Path(job.raw_path)
+            ),
         }
 
     return response
@@ -940,11 +1046,7 @@ def predict_for_instance(
     # Model path
     # --------------------------------------------------------
 
-    model_path = (
-        BASE_DIR
-        / "data"
-        / f"model_{job_id}.joblib"
-    )
+    model_path = get_job_model_path(job_id)
 
     if not model_path.exists():
 
@@ -1663,6 +1765,131 @@ def get_chart(
 
 
 # ============================================================
+# DOWNLOAD JOB OUTPUTS
+# ============================================================
+
+
+def get_authorized_job(
+    job_id: str,
+    current_user: User,
+    db: Session,
+) -> Job:
+    """
+    Return a job after applying the same access-control rules
+    used by the existing job APIs.
+    """
+
+    job = (
+        db.query(Job)
+        .filter(
+            Job.id == job_id
+        )
+        .first()
+    )
+
+    if not job:
+        raise HTTPException(
+            status_code=404,
+            detail="Job not found.",
+        )
+
+    if (
+        not current_user.is_admin
+        and job.user_id != current_user.id
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied.",
+        )
+
+    return job
+
+
+@app.get("/download/{job_id}/csv")
+def download_csv(
+    job_id: str,
+
+    current_user: User = Depends(
+        get_current_user
+    ),
+
+    db: Session = Depends(
+        get_db
+    ),
+):
+    """Download the CSV dataset stored for a job."""
+
+    job = get_authorized_job(
+        job_id,
+        current_user,
+        db,
+    )
+
+    csv_path = get_job_csv_path(job.id)
+
+    # Backward compatibility for jobs created before the
+    # job-output directory structure was introduced.
+    if not csv_path.exists() and job.raw_path:
+        legacy_path = Path(job.raw_path)
+
+        if legacy_path.exists() and legacy_path.suffix.lower() == ".csv":
+            csv_path = legacy_path
+
+    if not csv_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="CSV file not found.",
+        )
+
+    return FileResponse(
+        csv_path,
+        media_type="text/csv",
+        filename=(
+            f"{job.id}_dataset.csv"
+        ),
+    )
+
+
+@app.get("/download/{job_id}/model")
+def download_model(
+    job_id: str,
+
+    current_user: User = Depends(
+        get_current_user
+    ),
+
+    db: Session = Depends(
+        get_db
+    ),
+):
+    """Download the trained model stored for a job."""
+
+    job = get_authorized_job(
+        job_id,
+        current_user,
+        db,
+    )
+
+    model_path = get_job_model_path(job.id)
+
+    if not model_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Trained model file not found.",
+        )
+
+    return FileResponse(
+        model_path,
+        media_type=(
+            "application/octet-stream"
+        ),
+        filename=(
+            f"{job.id}_trained_model.joblib"
+        ),
+    )
+
+
+# ============================================================
 # HUMAN APPROVAL
 # ============================================================
 
@@ -2065,16 +2292,53 @@ def delete_job(
     # Delete trained model
     # --------------------------------------------------------
 
-    model_path = (
-        BASE_DIR
-        / "data"
-        / f"model_{job_id}.joblib"
-    )
+    model_path = get_job_model_path(job_id)
 
     if model_path.exists():
 
         try:
             model_path.unlink()
+
+        except OSError:
+            pass
+
+    # --------------------------------------------------------
+    # Delete complete job output directory
+    # --------------------------------------------------------
+    #
+    # This removes the job's CSV/model folders and any additional
+    # job-specific output files that may be added later.
+    # --------------------------------------------------------
+
+    job_output_dir = get_job_output_dir(job_id)
+
+    if job_output_dir.exists():
+
+        try:
+            shutil.rmtree(
+                job_output_dir
+            )
+
+        except OSError:
+            pass
+
+    # --------------------------------------------------------
+    # Legacy model cleanup
+    # --------------------------------------------------------
+    #
+    # Keep this for jobs created before the new output structure.
+    # --------------------------------------------------------
+
+    legacy_model_path = (
+        BASE_DIR
+        / "data"
+        / f"model_{job_id}.joblib"
+    )
+
+    if legacy_model_path.exists():
+
+        try:
+            legacy_model_path.unlink()
 
         except OSError:
             pass
