@@ -8,7 +8,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 import json
 
-from graph_state import AgentState
+from src.agent.graph_state import AgentState
 from llm_config import llm, safe_invoke
 
 

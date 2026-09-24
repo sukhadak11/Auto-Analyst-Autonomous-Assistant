@@ -1,19 +1,15 @@
 """Routes for user authentication."""
 
 from fastapi import APIRouter, Depends, HTTPException
+
 from sqlalchemy.orm import Session
+
 from pydantic import BaseModel, EmailStr
 
-import sys
-from pathlib import Path
+from src.db.database import get_db
+from src.db.models import User
 
-sys.path.append(
-    str(Path(__file__).resolve().parents[1] / "db")
-)
-
-from database import get_db
-from models import User
-from security import (
+from src.auth.security import (
     hash_password,
     verify_password,
     create_access_token,
@@ -23,7 +19,7 @@ from security import (
 router = APIRouter(
     prefix="/auth",
     tags=["auth"]
-)# This means all routes in this router start with: /auth
+)  # This means all routes in this router start with: /auth
 
 
 class RegisterRequest(BaseModel):
@@ -70,9 +66,9 @@ def register(
         hashed_password=hash_password(body.password)
     )
 
-    db.add(user) # Adds the new user object to the current SQLAlchemy session.
-    db.commit() # Commits the transaction to the database.
-    db.refresh(user) # Refreshes the Python object using the database state.
+    db.add(user)  # Adds the new user object to the current SQLAlchemy session.
+    db.commit()  # Commits the transaction to the database.
+    db.refresh(user)  # Refreshes the Python object using the database state.
 
     token = create_access_token(user.id)
 
@@ -97,7 +93,7 @@ def login(
         db.query(User)
         .filter(User.email == body.email)
         .first()
-    )# Check if email already exists in DB to avoid duplicates (should be unique).
+    )  # Check if email already exists in DB to avoid duplicates (should be unique).
 
     if not user or not verify_password(
         body.password,
@@ -117,4 +113,6 @@ def login(
         is_admin=user.is_admin,
         is_active=user.is_active,
     )
+
+
 # JWT : is based on header, playload and signature
