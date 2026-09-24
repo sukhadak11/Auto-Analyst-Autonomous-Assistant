@@ -217,10 +217,14 @@ def show_jobs():
             "",
         )
 
-        question = job.get(
-            "question",
-            "No question provided.",
-        )
+        question =(
+            job.get("question") or ""
+        ).strip()
+
+        if question:
+            st.subheader(question)
+        else:
+            st.subheader("Analysis")    
 
         status = job.get(
             "status",

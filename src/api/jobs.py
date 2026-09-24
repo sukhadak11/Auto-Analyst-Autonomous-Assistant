@@ -9,6 +9,7 @@ from fastapi import (
     APIRouter,
     Depends,
     File,
+    Form,
     HTTPException,
     UploadFile,
 )
@@ -41,11 +42,8 @@ router = APIRouter()
 
 @router.post("/upload")
 async def upload_dataset(
+    question: str = Form(...),
     file: UploadFile = File(...),
-    question: str = (
-        "Analyze this dataset and "
-        "summarize the key findings."
-    ),
     target_column: str | None = None,
     current_user: User = Depends(
         get_current_user

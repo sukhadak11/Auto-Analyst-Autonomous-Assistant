@@ -80,10 +80,10 @@ def show_reports():
             "",
         )
 
-        question = report.get(
-            "question",
-            "Analysis Report",
-        )
+        question = (report.get(
+            "question") or ""
+            ).strip()
+                
 
         status = report.get(
             "status",
@@ -116,7 +116,10 @@ def show_reports():
 
         with st.container(border=True):
 
-            st.subheader(question)
+            if question:
+                st.subheader(question)
+            else:
+                st.subheader("Analysis Report")    
 
             # Metadata
             col1, col2, col3 = st.columns(3)

@@ -74,18 +74,20 @@ Do not ignore the feedback."""
     research_findings = state.get("research_findings", "")
     prediction_result = state.get("prediction_result", "Not computed in this analysis.")
 
+    question = state.get("question")
+    if not question or not question.strip():
+        raise ValueError("Analysis question is missing.")
+
+    question = question.strip()
 
     prompt = REPORT_PROMPT.format(
-        question=state.get("question", "Analyze this dataset and summarize the key findings."),
+        question=question,
         data_findings=state.get("data_findings", "None provided."),
         feature_importance_summary=feature_importance_summary,
         research_findings=research_findings or "None provided.",
         prediction_result=prediction_result,
         revision_note=revision_note,
     )
-
-    response = safe_invoke(llm.bind(max_tokens=2500), prompt)
-    llm_report = response.content.strip()
 
     explanations = state.get("explanations", [])
     analytical_decisions = format_analytical_decisions(explanations)
