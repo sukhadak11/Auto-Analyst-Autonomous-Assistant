@@ -14,21 +14,11 @@ import threading
 
 
 router = APIRouter()
-
-
-# ============================================================
 # REQUEST MODEL
-# ============================================================
-
 class ApprovalRequest(BaseModel):
     decision: str
     notes: str | None = None
-
-
-# ============================================================
 # APPROVE / REJECT / REQUEST REVISION
-# ============================================================
-
 @router.post("/approve/{job_id}")
 def approve_job(
     job_id: str,
@@ -70,11 +60,7 @@ def approve_job(
                 "or 'needs_revision'."
             ),
         )
-
-    # --------------------------------------------------------
     # APPROVED
-    # --------------------------------------------------------
-
     if decision == "approved":
 
         job.status = "approved"
@@ -92,11 +78,7 @@ def approve_job(
                 "Job approved successfully."
             ),
         }
-
-    # --------------------------------------------------------
     # REJECTED
-    # --------------------------------------------------------
-
     if decision == "rejected":
 
         job.status = "rejected"
@@ -114,11 +96,7 @@ def approve_job(
                 "Job rejected."
             ),
         }
-
-    # --------------------------------------------------------
     # NEEDS REVISION
-    # --------------------------------------------------------
-
     job.status = "needs_revision"
     job.human_decision = "needs_revision"
     job.human_notes = (
@@ -127,10 +105,7 @@ def approve_job(
 
     db.commit()
 
-    # --------------------------------------------------------
     # Re-run pipeline with feedback
-    # --------------------------------------------------------
-
     if not job.raw_path:
         raise HTTPException(
             status_code=404,

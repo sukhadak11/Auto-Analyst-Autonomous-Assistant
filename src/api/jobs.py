@@ -34,15 +34,10 @@ from src.utils.paths import (
 )
 
 router = APIRouter()
-
-
-# ============================================================
 # UPLOAD
-# ============================================================
-
 @router.post("/upload")
 async def upload_dataset(
-    question: str = Form(...),
+    question: str = Form(...), # means question is a required string value received from an HTML form in FastAPI
     file: UploadFile = File(...),
     target_column: str | None = None,
     current_user: User = Depends(
@@ -135,12 +130,7 @@ async def upload_dataset(
             .relative_to(BASE_DIR)
         ),
     }
-
-
-# ============================================================
 # STATUS
-# ============================================================
-
 @router.get("/status/{job_id}")
 def get_status(
     job_id: str,
@@ -208,12 +198,7 @@ def get_status(
         }
 
     return response
-
-
-# ============================================================
 # ALL JOBS
-# ============================================================
-
 @router.get("/jobs")
 def list_jobs(
     current_user: User = Depends(
@@ -246,12 +231,7 @@ def list_jobs(
         }
         for job in jobs
     ]
-
-
-# ============================================================
 # REPORTS
-# ============================================================
-
 @router.get("/reports")
 def list_reports(
     current_user: User = Depends(
@@ -294,12 +274,7 @@ def list_reports(
         }
         for job in jobs
     ]
-
-
-# ============================================================
 # DELETE JOB
-# ============================================================
-
 @router.delete("/jobs/{job_id}")
 def delete_job(
     job_id: str,
@@ -326,9 +301,8 @@ def delete_job(
 
             try:
                 raw_path.unlink()
-            except OSError:
+            except OSError: # means catch an operating-system-related error, such as a file or directory access problem
                 pass
-
     # Delete charts
     for chart in (
         job.generated_charts or []
@@ -409,12 +383,7 @@ def delete_job(
             "Job deleted successfully."
         ),
     }
-
-
-# ============================================================
 # REPROCESS
-# ============================================================
-
 @router.post("/reprocess/{job_id}")
 def reprocess_job(
     job_id: str,

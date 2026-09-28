@@ -2,7 +2,7 @@
 import os
 from langchain_groq import ChatGroq
 from src.agent.graph_state import AgentState
-from llm_config import llm, safe_invoke
+from src.utils.llm_config import llm, safe_invoke
 critic_llm = ChatGroq(
     model="openai/gpt-oss-20b",
     api_key=os.getenv("GROQ_API_KEY"),

@@ -13,7 +13,7 @@ from langgraph.prebuilt import create_react_agent
 
 from graph_state import AgentState
 from tools import search_tool, retrieve_documents
-from llm_config import llm, safe_invoke
+from src.utils.llm_config import llm, safe_invoke
 
 
 # =========================================================

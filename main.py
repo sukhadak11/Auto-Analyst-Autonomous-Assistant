@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.auth.routes import router as auth_router
+from src.api.routes import router as auth_router
 from src.db.database import Base, engine
 from src.api import (
     jobs,

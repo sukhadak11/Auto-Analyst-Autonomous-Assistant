@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from graph_state import AgentState
-from llm_config import safe_invoke
+from src.utils.llm_config import safe_invoke
 from pathlib import Path
 import sys
 

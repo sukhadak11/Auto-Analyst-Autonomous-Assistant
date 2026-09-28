@@ -141,6 +141,6 @@ def download_model(
 
     return FileResponse(
         path=str(model_path),
-        media_type="application/octet-stream",
+        media_type="application/octet-stream", # application/octet-stream` means generic binary data, usually telling the browser to download the file rather than display it
         filename="trained_model.joblib",
     )

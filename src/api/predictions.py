@@ -15,20 +15,10 @@ from src.utils.paths import get_job_model_path
 
 
 router = APIRouter()
-
-
-# ============================================================
 # REQUEST MODEL
-# ============================================================
-
 class PredictionRequest(BaseModel):
     features: dict
-
-
-# ============================================================
 # PREDICTION
-# ============================================================
-
 @router.post("/predict/{job_id}")
 def predict(
     job_id: str,
@@ -49,11 +39,7 @@ def predict(
         current_user,
         db,
     )
-
-    # --------------------------------------------------------
     # Find trained model
-    # --------------------------------------------------------
-
     model_path = get_job_model_path(job_id)
 
     if not model_path.exists():
@@ -61,11 +47,7 @@ def predict(
             status_code=404,
             detail="Trained model not found.",
         )
-
-    # --------------------------------------------------------
     # Load model
-    # --------------------------------------------------------
-
     try:
         model = joblib.load(model_path)
 
@@ -74,11 +56,7 @@ def predict(
             status_code=500,
             detail=f"Unable to load model: {exc}",
         )
-
-    # --------------------------------------------------------
     # Prepare input
-    # --------------------------------------------------------
-
     if not request.features:
         raise HTTPException(
             status_code=400,

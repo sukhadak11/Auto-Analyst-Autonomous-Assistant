@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from llm_config import llm, safe_invoke
+from src.utils.llm_config import llm, safe_invoke
 sys.path.append(str(Path(__file__).resolve().parents[1] / "agent"))
 import pandas as pd
 from src.agent.explanation_schema import make_explanation

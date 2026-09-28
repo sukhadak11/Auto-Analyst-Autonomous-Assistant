@@ -7,11 +7,7 @@ from src.db.models import Job, User
 
 
 router = APIRouter()
-
-
-# ============================================================
 # ADMIN DASHBOARD
-# ============================================================
 
 @router.get("/admin/dashboard")
 def admin_dashboard(

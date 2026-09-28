@@ -71,10 +71,7 @@ def run_pipeline(
     db = SessionLocal()
 
     try:
-        # --------------------------------------------------
         # Get job
-        # --------------------------------------------------
-
         job = (
             db.query(Job)
             .filter(Job.id == job_id)
@@ -84,55 +81,34 @@ def run_pipeline(
         if not job:
             return
 
-        # --------------------------------------------------
         # Mark job as running
-        # --------------------------------------------------
 
         job.status = "running"
         job.error = None
 
         db.commit()
-
-        # --------------------------------------------------
         # Build LangGraph workflow
-        # --------------------------------------------------
-
         app_graph = build_graph_for_api()
-
-        # --------------------------------------------------
-        # Create initial state
-        # --------------------------------------------------
-
+ # Create initial state
         initial_state = create_initial_state(
             job_id=job_id,
             saved_path=saved_path,
             question=question,
             target_column=target_column,
         )
-
-        # --------------------------------------------------
         # LangGraph configuration
-        # --------------------------------------------------
 
         config = {
             "configurable": {
                 "thread_id": job_id
             }
         }
-
-        # --------------------------------------------------
-        # Execute workflow
-        # --------------------------------------------------
-
+# Execute workflow
         final_state = app_graph.invoke(
             initial_state,
             config=config,
         )
-
-        # --------------------------------------------------
         # Save results
-        # --------------------------------------------------
-
         job.status = "awaiting_approval"
 
         job.report = final_state.get(
@@ -186,11 +162,7 @@ def run_pipeline(
         db.commit()
 
     except Exception as exc:
-
-        # --------------------------------------------------
         # Mark job as failed
-        # --------------------------------------------------
-
         job = (
             db.query(Job)
             .filter(Job.id == job_id)
