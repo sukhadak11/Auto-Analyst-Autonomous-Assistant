@@ -4,8 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from sqlalchemy.orm import Session
 
-from pydantic import BaseModel, EmailStr
-
+from src.schema.auth import (
+    RegisterRequest,
+    LoginRequest,
+    TokenResponse,
+)
 from src.db.database import get_db
 from src.db.models import User
 
@@ -19,27 +22,8 @@ from src.auth.security import (
 router = APIRouter(
     prefix="/auth",
     tags=["auth"]
-)  # This means all routes in this router start with: /auth
-
-
-class RegisterRequest(BaseModel):
-    email: EmailStr
-    password: str | bytes
-
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str | bytes
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    user_id: str
-    email: str
-    is_admin: bool
-    is_active: bool
-
+)  
+# This means all routes in this router start with: /auth
 
 @router.post(
     "/register",

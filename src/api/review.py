@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from src.schema.review import ApprovalRequest
 from sqlalchemy.orm import Session
 
 from src.auth.dependencies import get_current_user
@@ -15,9 +15,6 @@ import threading
 
 router = APIRouter()
 # REQUEST MODEL
-class ApprovalRequest(BaseModel):
-    decision: str
-    notes: str | None = None
 # APPROVE / REJECT / REQUEST REVISION
 @router.post("/approve/{job_id}")
 def approve_job(

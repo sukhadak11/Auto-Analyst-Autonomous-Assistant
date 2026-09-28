@@ -3,7 +3,7 @@ from pathlib import Path
 import joblib
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from src.schema.predictions import PredictionRequest
 from sqlalchemy.orm import Session
 
 from src.auth.dependencies import get_current_user
@@ -15,9 +15,6 @@ from src.utils.paths import get_job_model_path
 
 
 router = APIRouter()
-# REQUEST MODEL
-class PredictionRequest(BaseModel):
-    features: dict
 # PREDICTION
 @router.post("/predict/{job_id}")
 def predict(
