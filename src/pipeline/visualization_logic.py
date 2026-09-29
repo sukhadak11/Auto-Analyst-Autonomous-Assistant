@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 
 import matplotlib
-matplotlib.use("Agg")
+matplotlib.use("Agg") # use non-interactive backend for headless environment 
 
 import matplotlib.pyplot as plt
 import pandas as pd

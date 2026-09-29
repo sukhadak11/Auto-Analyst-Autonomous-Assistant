@@ -4,17 +4,8 @@ from typing import List
 import time
 import adalflow as adal
 from dotenv import load_dotenv
-
-
-# ---------------------------------------------------------
-# Load environment variables
-# ---------------------------------------------------------
 load_dotenv()
-
-
-# ---------------------------------------------------------
 # Structured output schema
-# ---------------------------------------------------------
 @dataclass
 class AnalysisReport(adal.DataClass):
     """

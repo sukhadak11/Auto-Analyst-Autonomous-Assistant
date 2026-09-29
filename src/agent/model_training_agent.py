@@ -18,11 +18,7 @@ from src.pipeline.model_training_logic import (
 
 
 def model_training_agent_node(state: AgentState) -> AgentState:
-
-    # ---------------------------------------------------------------
     # Get pipeline configuration from state
-    # ---------------------------------------------------------------
-
     clean_path = state.get(
         "clean_path",
         "data/clean_data.csv"
@@ -42,10 +38,7 @@ def model_training_agent_node(state: AgentState) -> AgentState:
         "manual_test"
     )
 
-    # ---------------------------------------------------------------
     # Load cleaned dataset
-    # ---------------------------------------------------------------
-
     df = pd.read_csv(
         clean_path
     )

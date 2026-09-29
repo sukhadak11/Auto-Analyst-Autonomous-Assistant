@@ -5,7 +5,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1] / "agent"))
 import pandas as pd
 import numpy as np
 from scipy import stats
-from explanation_schema import make_explanation
+from src.agent.explanation_schema import make_explanation
 
 
 def detect_target_kind(y: pd.Series) -> str:

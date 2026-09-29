@@ -14,12 +14,7 @@ from langgraph.prebuilt import create_react_agent
 from graph_state import AgentState
 from tools import search_tool, retrieve_documents
 from src.utils.llm_config import llm, safe_invoke
-
-
-# =========================================================
 # Research Agent
-# =========================================================
-
 research_tools = [
     search_tool,
     retrieve_documents,
@@ -53,12 +48,7 @@ Do not invent facts or external sources.
 Task:
 {task}
 """
-
-
-# =========================================================
 # Research Node
-# =========================================================
-
 def research_agent_node(
     state: AgentState,
 ) -> AgentState:

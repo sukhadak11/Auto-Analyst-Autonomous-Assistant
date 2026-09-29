@@ -12,9 +12,7 @@ from src.pipeline.report_formatting import (
     format_analytical_decisions,
     format_confidence_assessment,
 )
-
 load_dotenv()
-
 llm = ChatGroq(
     model="openai/gpt-oss-20b",
     api_key=os.getenv("GROQ_API_KEY"),
@@ -88,6 +86,10 @@ Do not ignore the feedback."""
         prediction_result=prediction_result,
         revision_note=revision_note,
     )
+
+    llm_report = safe_invoke(llm, prompt)
+    if hasattr(llm_report, "content"):
+        llm_report = llm_report.content
 
     explanations = state.get("explanations", [])
     analytical_decisions = format_analytical_decisions(explanations)

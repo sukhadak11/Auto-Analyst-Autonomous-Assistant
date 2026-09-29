@@ -2,8 +2,6 @@
 from typing import TypedDict, List, Annotated
 import operator
 from src.agent.explanation_schema import Explanation
-
-
 class AgentState(TypedDict):
 
     # User request

@@ -1,6 +1,6 @@
 from collections import Counter
 from typing import List
-from explanation_schema import Explanation
+from src.agent.explanation_schema import Explanation
 
 
 def format_analytical_decisions(explanations: List[Explanation]) -> str:

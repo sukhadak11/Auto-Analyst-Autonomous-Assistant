@@ -26,11 +26,3 @@ def profiling_agent_node(state: AgentState) -> AgentState:
         format_explanations(profile["explanations"])
     state["messages"] = state.get("messages", []) + ["Profiling Agent: dataset analyzed dynamically."]
     return state
-
-'''
-if __name__ == "__main__":
-    # test with NO target/dataset assumptions hardcoded — only the file path
-    test_state = {"raw_path": "data/telecommunications_churn.csv", "explanations": [], "messages": []}
-    result = profiling_agent_node(test_state)
-    print(result["data_findings"])
-'''

@@ -1,10 +1,6 @@
-# src/agent/tools.py
-
 import os
-
 os.environ["HF_HUB_OFFLINE"] = "1"
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
-
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -13,11 +9,7 @@ from langchain_core.tools import tool
 from tavily import TavilyClient
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
-
-
-# =========================================================
 # Tavily Configuration
-# =========================================================
 
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 
@@ -26,11 +18,7 @@ tavily_client = (
     if TAVILY_API_KEY
     else None
 )
-
-
-# =========================================================
 # Vector Database Configuration
-# =========================================================
 
 PERSIST_DIR = "data/chroma_db"
 
@@ -45,12 +33,7 @@ _vectordb = Chroma(
     persist_directory=PERSIST_DIR,
     embedding_function=_embeddings,
 )
-
-
-# =========================================================
 # Web Search Tool
-# =========================================================
-
 @tool
 def search_tool(query: str) -> str:
     """
@@ -121,11 +104,7 @@ def search_tool(query: str) -> str:
             "dataset and internal context."
         )
 
-
-# =========================================================
 # Internal Document Retrieval Tool
-# =========================================================
-
 @tool
 def retrieve_documents(query: str) -> str:
     """

@@ -1,21 +1,16 @@
 import pandas as pd
 from pathlib import Path
 import sys
-
 from graph_state import AgentState
-
 sys.path.append(
     str(
         Path(__file__).resolve().parents[1]
         / "pipeline"
     )
 )
-
-from visualization_logic import (
+from src.pipeline.visualization_logic import (
     select_and_generate_visualizations
 )
-
-
 def visualization_agent_node(
     state: AgentState,
 ) -> AgentState:
@@ -52,11 +47,7 @@ def visualization_agent_node(
     clean_file = Path(
         clean_path
     )
-
-    # --------------------------------------------------------
     # Validate cleaned dataset
-    # --------------------------------------------------------
-
     if not clean_file.exists():
 
         message = (
@@ -78,11 +69,7 @@ def visualization_agent_node(
         )
 
         return state
-
-    # --------------------------------------------------------
     # Load dataset
-    # --------------------------------------------------------
-
     try:
 
         df = pd.read_csv(
@@ -110,11 +97,7 @@ def visualization_agent_node(
         )
 
         return state
-
-    # --------------------------------------------------------
     # Generate visualizations
-    # --------------------------------------------------------
-
     try:
 
         charts, explanations = (
@@ -152,21 +135,10 @@ def visualization_agent_node(
         )
 
         return state
-
-    # --------------------------------------------------------
     # Normalize chart metadata
-    # --------------------------------------------------------
-
     normalized_charts = []
 
     for chart in charts:
-
-        # Expected format:
-        # {
-        #     "chart_type": "...",
-        #     "filename": "..."
-        # }
-
         if isinstance(chart, dict):
 
             filename = (
@@ -230,10 +202,7 @@ def visualization_agent_node(
                 }
             )
 
-    # --------------------------------------------------------
     # Remove duplicate charts
-    # --------------------------------------------------------
-
     unique_charts = []
 
     seen = set()
@@ -258,24 +227,15 @@ def visualization_agent_node(
             )
 
     normalized_charts = unique_charts
-
-    # --------------------------------------------------------
     # Store charts
-    # --------------------------------------------------------
-
     state["generated_charts"] = (
         normalized_charts
     )
-
-    # --------------------------------------------------------
     # Store explanations safely
-    # --------------------------------------------------------
-
     existing_explanations = state.get(
         "explanations",
         [],
     )
-
     normalized_explanations = []
 
     for explanation in explanations:
@@ -323,11 +283,7 @@ def visualization_agent_node(
         existing_explanations
         + normalized_explanations
     )
-
-    # --------------------------------------------------------
     # Data findings
-    # --------------------------------------------------------
-
     if normalized_charts:
 
         chart_names = [
@@ -356,11 +312,7 @@ def visualization_agent_node(
         + "\n"
         + finding
     )
-
-    # --------------------------------------------------------
     # Messages
-    # --------------------------------------------------------
-
     state["messages"] = (
         state.get(
             "messages",
